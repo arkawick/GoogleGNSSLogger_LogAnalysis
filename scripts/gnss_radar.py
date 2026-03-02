@@ -88,7 +88,11 @@ SEC_COL = {
     "ADR":   "#E65100",   # deep orange
     "RES":   "#6A1B9A",   # deep purple
 }
-STATUS_SCORE = {"PASS": 0.04, "FAIL": 1.00, "NA": 0.48}
+# Polygon radius: PASS = 0.0 so polygon vertices land exactly at the origin
+# and edges radiate cleanly from centre rather than floating as a chord.
+STATUS_SCORE_POLY = {"PASS": 0.00, "FAIL": 1.00, "NA": 0.48}
+# Dot radius: keep PASS markers slightly visible inside the pass zone
+STATUS_SCORE_DOT  = {"PASS": 0.06, "FAIL": 1.00, "NA": 0.48}
 
 PASS_ZONE_R  = 0.32       # radius of inner green "pass" circle
 LABEL_R      = 1.23       # radius at which check labels are placed
@@ -99,13 +103,14 @@ BG_COLOR     = "#F5F5F5"
 # ─────────────────────────────────────────────────────────────────────────────
 # Polar angles  (clockwise from top / 12 o'clock)
 # ─────────────────────────────────────────────────────────────────────────────
-N      = len(CHECKS)
-angles = np.linspace(np.pi / 2, np.pi / 2 - 2 * np.pi, N, endpoint=False)
-scores = np.array([STATUS_SCORE[c[2]] for c in CHECKS])
+N            = len(CHECKS)
+angles       = np.linspace(np.pi / 2, np.pi / 2 - 2 * np.pi, N, endpoint=False)
+scores_poly  = np.array([STATUS_SCORE_POLY[c[2]] for c in CHECKS])
+scores_dot   = np.array([STATUS_SCORE_DOT[c[2]]  for c in CHECKS])
 
 # Close polygon
 ang_c = np.append(angles, angles[0])
-sc_c  = np.append(scores, scores[0])
+sc_c  = np.append(scores_poly, scores_poly[0])
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Figure
@@ -143,7 +148,7 @@ ax.plot(ang_c, sc_c, color=FILL_COLOR, lw=0.9, zorder=4)
 MARKER = {"PASS": ("o", 7), "FAIL": ("o", 7), "NA": ("D", 4)}
 for i, (sec, _, st) in enumerate(CHECKS):
     mk, ms = MARKER[st]
-    ax.plot(angles[i], scores[i], mk,
+    ax.plot(angles[i], scores_dot[i], mk,
             color=SEC_COL[sec], markersize=ms,
             markeredgecolor="white", markeredgewidth=0.7, zorder=5)
 

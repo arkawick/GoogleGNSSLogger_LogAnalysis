@@ -1,0 +1,42 @@
+Section,Key,Name,Threshold,Operator,Unit,Description
+BASIC_CHECKS,cn0_top4,Avg CN0 Top 4 Per Epoch,40.0,>=,dBHz,Average CN0 of the top 4 signals per epoch
+BASIC_CHECKS,max_epoch_gap,Max Time Between Epochs,2000.0,<=,ms,Maximum gap between consecutive measurement epochs
+BASIC_CHECKS,avg_gps_l1,Avg Valid Per Epoch (GPS_L1),7.0,>=,signals/epoch,Average number of valid GPS L1 signals per epoch
+BASIC_CHECKS,avg_gps_l5,Avg Valid Per Epoch (GPS_L5),4.0,>=,signals/epoch,Average number of valid GPS L5 signals per epoch
+BASIC_CHECKS,avg_glo_g1,Avg Valid Per Epoch (GLO_G1),4.0,>=,signals/epoch,Average number of valid GLONASS G1 signals per epoch
+BASIC_CHECKS,avg_gal_e1,Avg Valid Per Epoch (GAL_E1),5.0,>=,signals/epoch,Average number of valid Galileo E1 signals per epoch
+BASIC_CHECKS,avg_gal_e5a,Avg Valid Per Epoch (GAL_E5A),4.0,>=,signals/epoch,Average number of valid Galileo E5A signals per epoch
+BASIC_CHECKS,avg_gal_e5b,Avg Valid Per Epoch (GAL_E5B),4.0,>=,signals/epoch,Average number of valid Galileo E5B signals per epoch
+BASIC_CHECKS,avg_bds_b1i,Avg Valid Per Epoch (BDS_B1I),4.0,>=,signals/epoch,Average number of valid BeiDou B1I signals per epoch
+BASIC_CHECKS,avg_bds_b2a,Avg Valid Per Epoch (BDS_B2A),4.0,>=,signals/epoch,Average number of valid BeiDou B2A signals per epoch
+BASIC_CHECKS,avg_bds_b1c,Avg Valid Per Epoch (BDS_B1C),4.0,>=,signals/epoch,Average number of valid BeiDou B1C signals per epoch
+BASIC_CHECKS,req_sig_types,Required Sig Types,1.0,>=,of each required type,"Each required signal type (GPS L1+L5, GAL E1+E5A+E5B, BDS B1I+B2A+B1C, GLO G1) must average >= 1 per epoch. PASS if missing_types list is empty."
+BASIC_CHECKS,usable_pct,Measurement State Usable,85.0,>=,%,Percentage of raw measurements with STATE_TOW_DECODED or STATE_TOW_KNOWN set
+BASIC_CHECKS,dup_signals,Duplicate Signals,0,==,count,Number of duplicate (same SVid + frequency) signals in a single epoch
+TIME,large_jumps,Time Tag Large Jumps,0,==,count,Number of gaps > 2000 ms between consecutive epochs
+TIME,jitter_std_ms,Time Tag Jitter,10.0,<=,ms (std),Standard deviation of inter-epoch time differences
+TIME,timesync_max_ms,Time-sync Max Jitter,5.0,<=,ms,Maximum deviation of hardware clock sync from nominal 1-second intervals
+TIME,timesync_std_ms,Time-sync Jitter,3.0,<=,ms (std),Standard deviation of hardware clock sync jitter across all epochs
+TIME,elapsed_range_ms,Delta ElapsedRealtimeNanos Range,10.0,<=,ms,Range (max - min) of delta-ElapsedRealtimeNanos across epochs
+TIME,elapsed_std_ms,Delta ElapsedRealtimeNanos Std,3.0,<=,ms (std),Standard deviation of delta-ElapsedRealtimeNanos across epochs
+TIME,clkbias_mps_std,Delta Clock Bias MPS Std,1.0,<=,m/s,Standard deviation of receiver clock bias drift (metres per second)
+TIME,ls_pr_res_std_m,LS-Freq PR Residuals Std,5.0,<=,m,Standard deviation of L1 pseudorange residuals from a least-squares clock-only fit
+ADR_PRR_PR,pct_valid_adr,Percent Valid ADR,50.0,>=,%,Percentage of measurements with ADR_STATE_VALID set (bit 0 of AccumulatedDeltaRangeState)
+ADR_PRR_PR,pct_usable_adr,Percent Usable ADR,80.0,>=,%,Percentage of measurements with ADR valid and not reset or cycle-slipped
+ADR_PRR_PR,adr_var_cyc,ADR Variability,0.5,<=,cycles,Median absolute deviation of ADR residuals across satellites within an epoch
+ADR_PRR_PR,prr_dadr_med,Median (PRR - Delta(ADR)),0.1,<=,m/s,Median of the difference between pseudorange rate and delta-ADR (should be ~0)
+ADR_PRR_PR,prr_dadr_std,Std (PRR - Delta(ADR)),0.5,<=,m/s,Standard deviation of (PRR - delta-ADR); measures consistency between Doppler and phase
+ADR_PRR_PR,l1_dpr_dadr,L1freq (Delta(PR) - Delta(ADR)),0.5,<=,m,Median absolute deviation of L1 delta-pseudorange minus delta-ADR across epochs
+ADR_PRR_PR,l5_dpr_dadr,L5freq (Delta(PR) - Delta(ADR)),0.5,<=,m,Median absolute deviation of L5 delta-pseudorange minus delta-ADR across epochs
+RESIDUALS,l1_pr_res_std_m,L1-Freq PR Residuals Std,5.0,<=,m,Standard deviation of L1 pseudorange residuals after clock estimation
+RESIDUALS,l5_pr_res_std_m,L5-Freq PR Residuals Std,3.0,<=,m,Standard deviation of L5 pseudorange residuals after clock estimation
+RESIDUALS,l1_norm_rms,L1-Freq Median Normalized PR Residual RMS,3.0,<=,dimensionless,RMS of L1 PR residuals normalized by the reported pseudorange uncertainty; should be ~1.0 if uncertainties are well-calibrated
+RESIDUALS,l5_norm_rms,L5-Freq Median Normalized PR Residual RMS,3.0,<=,dimensionless,RMS of L5 PR residuals normalized by the reported pseudorange uncertainty
+RESIDUALS,pct_pr_outliers,Percent PR Residuals Outliers,5.0,<=,%,Percentage of L1 pseudorange residuals exceeding 3-sigma of the per-epoch residual distribution
+RESIDUALS,n_adr_epochs,Num Epochs for ADR Residual Analysis,1,>=,epochs,Minimum number of epochs with enough valid ADR to compute ADR residuals
+RESIDUALS,adr_res_std_cyc,ADR Residuals Std,0.05,<=,cycles,Standard deviation of carrier-phase (ADR) residuals after clock and geometry removal
+RESIDUALS,norm_adr_rms,Median Normalized ADR Residual RMS,3.0,<=,dimensionless,RMS of ADR residuals normalized by the reported ADR uncertainty
+RESIDUALS,pct_high_adr_ep,Percent Epochs with High ADR Residuals,10.0,<=,%,Percentage of epochs where the ADR residual RMS exceeds 3× the median
+RESIDUALS,prr_res_std_mps,PRR Residuals Std,0.5,<=,m/s,Standard deviation of pseudorange-rate (Doppler) residuals after velocity estimation
+RESIDUALS,pct_high_prr_ep,Percent Epochs with High PRR Residuals,20.0,<=,%,Percentage of epochs where PRR residual RMS exceeds 3× the median
+RESIDUALS,norm_prr_rms,Median Normalized PRR Residual RMS,3.0,<=,dimensionless,RMS of PRR residuals normalized by the reported PRR uncertainty; 1.0 = perfectly calibrated

@@ -2,310 +2,751 @@
 
 ## What Is This File?
 
-This is the main log produced by the GnssLogger app. It is a plain-text
-comma-separated file where every row begins with a **type tag** that identifies
-which Android sensor or GNSS subsystem produced that measurement.
-The file header (lines starting with `#`) lists the column definitions for every
-row type.
+This is the primary log file produced by the **GnssLogger** app. It is a plain-text
+comma-separated file where every data row begins with a **type tag** identifying which
+Android sensor or GNSS subsystem produced that measurement. Comment lines (starting
+with `#`) contain column headers for each row type — parse these to obtain correct
+column indices because GnssLogger may add or remove columns across app versions.
 
-The examples and statistics in this document are drawn from **Log 1 (Xiaomi 13,
-Android 13, 44 seconds, 17:55 UTC 25 Feb 2026)**. See the "Log2 Differences"
-section at the end for how Log 2 (Sony XQ-GE54) compares in this format.
+```
+# Raw,utcTimeMillis,TimeNanos,LeapSecond,...   ← column header (comment, starts with #)
+Raw,1772042137424,6567086705028,...             ← data row
+```
 
 ---
 
-## Row Types and Record Counts
+## Row Types Overview
 
-| Row type | Count | Source |
-|----------|------:|--------|
-| `Raw` | 311 | GNSS chip — raw pseudorange measurements |
-| `Status` | 2 205 | GNSS chip — satellite visibility & signal status |
-| `Fix` | 95 | Android location API — computed position fixes |
-| `UncalAccel` | 4 841 | Accelerometer (uncalibrated) |
-| `UncalGyro` | 4 840 | Gyroscope (uncalibrated) |
-| `UncalMag` | 4 523 | Magnetometer (uncalibrated) |
-| `OrientationDeg` | 4 838 | Fused orientation sensor |
-| `GameRotationVector` | ~4 800 | Rotation vector (no magnetic north) |
+| Row type | Source | What it contains |
+|----------|--------|-----------------|
+| `Raw` | GNSS chip | One raw measurement per satellite signal per epoch |
+| `Status` | GNSS chip (`GnssStatus` API) | Satellite visibility snapshot: CN0, azimuth, elevation, used-in-fix |
+| `Fix` | Android `LocationManager` | Computed position + accuracy from GPS/FLP/NLP providers |
+| `UncalAccel` | Accelerometer | 3-axis specific force at ~100 Hz |
+| `UncalGyro` | Gyroscope | 3-axis angular velocity at ~100 Hz |
+| `UncalMag` | Magnetometer | 3-axis magnetic field at ~100 Hz |
+| `OrientationDeg` | Sensor fusion | Fused yaw/roll/pitch in degrees |
+| `GameRotationVector` | Sensor fusion | Rotation quaternion (no magnetic north reference) |
+| `Nav` | GNSS chip | Raw navigation message frames (not exposed on most chipsets) |
+| `Agc` | GNSS chip | Per-constellation AGC (not exposed on most chipsets) |
 
 ---
 
 ## 1. `Raw` Rows — Chip-Level GNSS Measurements
 
-### What they represent
-These are the **lowest-level GNSS observables** the phone chipset exposes to
-Android. Each row is one measurement of one satellite signal at one moment in
-time. They are the raw building blocks from which every navigation solution is
-ultimately derived.
+### What They Represent
 
-### Column-by-column explanation
+`Raw` rows are the **lowest-level GNSS observables** the Android HAL (Hardware
+Abstraction Layer) exposes. Each row contains one measurement of one satellite signal
+at one moment in time. They are the raw building blocks from which every navigation
+solution is derived. All fields come from the Android `GnssMeasurement` API.
 
-| Column | Example | Meaning |
-|--------|---------|---------|
-| `utcTimeMillis` | 1772042137424 | Wall-clock time (Unix epoch ms, UTC) when the measurement was taken |
-| `TimeNanos` | 6567086... | Hardware clock time in nanoseconds since the receiver was powered on |
-| `LeapSecond` | 18 | Current GPS–UTC leap second offset (18 s as of 2026) |
-| `TimeUncertaintyNanos` | 0.0 | Uncertainty on the hardware clock (0 = perfectly disciplined) |
-| `FullBiasNanos` | –1772... ×10⁹ | Integer-nanosecond offset between hardware clock and GPS time |
-| `BiasNanos` | 0.3... | Sub-nanosecond fractional part of the clock bias |
-| `BiasUncertaintyNanos` | 75–129 | **1-sigma uncertainty on the clock bias** — this device reports 75–129 ns, which is high for a consumer chipset. The gnss-lib-py default threshold (40 ns) is relaxed to 200 ns to preserve measurements. |
-| `DriftNanosPerSecond` | –0.06 | Clock frequency drift (nanoseconds per second) |
-| `DriftUncertaintyNanosPerSecond` | 0.002 | 1-sigma uncertainty on the drift |
-| `HardwareClockDiscontinuityCount` | 0 | Number of times the hardware clock has reset; non-zero means clock jumps occurred |
-| `Svid` | 8 | Satellite vehicle ID within its constellation |
-| `TimeOffsetNanos` | 0.0 | Sub-measurement time offset (usually 0) |
-| `State` | 16431 | Bitmask of tracking-state flags (e.g., code-lock, bit-sync, sub-frame-sync, TOW-decoded) |
-| `ReceivedSvTimeNanos` | 88233... | Satellite transmit time in nanoseconds (within GPS week) |
-| `ReceivedSvTimeUncertaintyNanos` | 23–58 | 1-sigma uncertainty on the received satellite time |
-| `Cn0DbHz` | 13.6–31.8 | **Carrier-to-Noise density** in dB-Hz. Higher = stronger signal. <25 is poor, 25–35 is typical, >35 is excellent. |
-| `PseudorangeRateMetersPerSecond` | –2564 to +2635 | **Doppler-derived range rate** — the rate at which the distance between phone and satellite is changing. Used to compute velocity. |
-| `PseudorangeRateUncertaintyMetersPerSecond` | 0.5–2.0 | 1-sigma uncertainty on the range rate |
-| `AccumulatedDeltaRangeState` | bitmask | Flags for carrier-phase tracking (ADR valid, reset, cycle slip) |
-| `AccumulatedDeltaRangeMeters` | varies | Integrated carrier phase (metres). Non-zero only if ADR is valid. |
-| `AccumulatedDeltaRangeUncertaintyMeters` | varies | 1-sigma uncertainty on ADR |
-| `CarrierFrequencyHz` | 1575420000 | Signal carrier frequency. 1575.42 MHz = GPS/Galileo/QZSS L1; 1602 MHz ± k×562.5 kHz = GLONASS L1; 1561.098 MHz = BeiDou B1I |
-| `ConstellationType` | 1–6 | 1=GPS, 2=SBAS, 3=GLONASS, 4=QZSS, 5=BeiDou, 6=Galileo |
-| `AgcDb` | varies | Automatic Gain Control level in dB — a proxy for interference/jamming; large negative = high interference |
-| `BasebandCn0DbHz` | 10–29 | CN0 measured at baseband only (before correlator), generally lower than `Cn0DbHz` |
-| `FullInterSignalBiasNanos` | varies | Inter-signal bias between this signal and GPS L1 reference |
-| `SatelliteInterSignalBiasNanos` | varies | Satellite-reported inter-signal bias |
-| `CodeType` | C | Signal code type: C=Civil (C/A), P=Precise, etc. |
-| `SvPositionEcefXMeters` | varies | Satellite X position in ECEF frame (metres) |
-| `SvPositionEcefYMeters` | varies | Satellite Y position in ECEF frame |
-| `SvPositionEcefZMeters` | varies | Satellite Z position in ECEF frame |
-| `SvVelocityEcefX/Y/ZMetersPerSecond` | varies | Satellite velocity in ECEF frame |
-| `SvClockBiasMeters` | varies | Satellite clock error in metres (= clock bias × speed of light) |
-| `SvClockDriftMetersPerSecond` | varies | Satellite clock drift rate in m/s |
-| `KlobucharAlpha0–3 / Beta0–3` | varies | Ionospheric correction model coefficients broadcast in the GPS navigation message |
+---
 
-### How a pseudorange is computed
+### 1.1 Receiver Time Fields
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `utcTimeMillis` | int | ms (Unix epoch) | Wall-clock UTC time when the measurement was taken. Derived from the system clock; may have leap-second discontinuities. |
+| `TimeNanos` | int | ns | Hardware GNSS clock time since receiver power-on. This is the primary time reference — it does not jump. |
+| `LeapSecond` | int | s | Current GPS–UTC leap-second offset. As of 2026 this is 18 s. Used to convert GPS time to UTC. |
+| `TimeUncertaintyNanos` | float | ns | 1-sigma uncertainty on `TimeNanos`. 0.0 means the hardware clock is disciplined to the GNSS timescale. |
+| `FullBiasNanos` | int | ns | Integer nanosecond offset: `TimeNanos − GPS_time_in_nanoseconds`. This is a large negative number (~−1.77 × 10¹⁸ ns). Must be added to `TimeNanos` to recover GPS epoch time. |
+| `BiasNanos` | float | ns | Sub-nanosecond fractional part of the clock bias not captured by `FullBiasNanos`. Typically < 1 ns. |
+| `BiasUncertaintyNanos` | float | ns | **1-sigma uncertainty on the combined clock bias** (`FullBiasNanos + BiasNanos`). This is the most important filtering threshold. See note below. |
+| `DriftNanosPerSecond` | float | ns/s | Receiver clock frequency drift. Equivalently: clock error rate in ns per second. |
+| `DriftUncertaintyNanosPerSecond` | float | ns/s | 1-sigma uncertainty on the drift. |
+| `HardwareClockDiscontinuityCount` | int | count | **Accumulated** counter (since device boot) of how many times the hardware clock was reset. This is NOT the number of resets in the current session. Do not use to detect in-session clock jumps. |
+
+**BiasUncertaintyNanos — critical threshold note:**
+
+The Google quality framework filters out measurements where
+`BiasUncertaintyNanos > threshold` (default 40 ns). However, different chipset
+architectures report very different values:
+
+| Chipset family | Typical BiasUncNanos | Recommended threshold |
+|---------------|---------------------|----------------------|
+| Dedicated GNSS modem (MPSS.DE, etc.) | 2–10 ns | 40 ns (standard) |
+| Modem-integrated GNSS (MPSS.HI, etc.) | 75–200+ ns | 200 ns (relaxed) |
+| Qualcomm Tensor / MediaTek | 5–40 ns | 40 ns (standard) |
+
+`scripts/run_analysis.py` auto-detects the chipset from the GnssLogger header and
+sets the threshold accordingly.
+
+---
+
+### 1.2 Satellite Identification Fields
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `Svid` | int | — | Satellite vehicle ID within its constellation. For GPS: 1–32 (PRN). For GLONASS: 1–24 (orbital slot). For Galileo: 1–36. For BeiDou: 1–63. For QZSS: 193–202 (or 1–10 in some HALs). |
+| `ConstellationType` | int | — | Constellation code: **1=GPS**, 2=SBAS, **3=GLONASS**, **4=QZSS**, **5=BeiDou**, **6=Galileo**, 7=NavIC |
+| `CarrierFrequencyHz` | float | Hz | Signal carrier frequency. Used to identify the frequency band: |
+
+**Carrier frequency → band mapping:**
+
+| Frequency (Hz) | Signal | Standard |
+|---------------|--------|---------|
+| 1 575 420 000 | GPS L1, Galileo E1, QZSS L1, BeiDou B1C | CDMA |
+| 1 602 000 000 + k × 562 500 | GLONASS L1 (k = channel number, −7 to +6) | FDMA |
+| 1 561 098 000 | BeiDou B1I | CDMA |
+| 1 176 450 000 | GPS L5, Galileo E5a, QZSS L5 | CDMA |
+| 1 207 140 000 | Galileo E5b, BeiDou B2b | CDMA |
+| 1 268 520 000 | Galileo E6, BeiDou B3I | CDMA |
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `CodeType` | string | — | Signal code type within the band. `C` = Civil/C/A. `P` = Precise (P-code). `I` = In-phase (BeiDou B1I). `Q` = Quadrature. `X` = combined I+Q. |
+| `TimeOffsetNanos` | float | ns | Sub-sample time offset of this measurement relative to `TimeNanos`. Usually 0.0. |
+
+---
+
+### 1.3 Measurement State (`State` Bitmask)
+
+The `State` field is a bitmask of tracking-lock flags. A measurement is considered
+**usable** (valid pseudorange) when at least one of these bits is set:
+- **Bit 3** (`STATE_TOW_DECODED = 8`): GPS/BDS/Galileo time-of-week has been decoded
+  from the navigation message.
+- **Bit 14** (`STATE_TOW_KNOWN = 16384`): TOW is known by other means (e.g. network
+  time injection).
+
+Full bitmask reference:
+
+| Bit | Value | Flag name | Meaning |
+|-----|------:|-----------|---------|
+| 0 | 1 | `STATE_CODE_LOCK` | Code phase tracking locked |
+| 1 | 2 | `STATE_BIT_SYNC` | Bit boundary synchronised |
+| 2 | 4 | `STATE_SUBFRAME_SYNC` | Subframe/page synchronised |
+| 3 | 8 | `STATE_TOW_DECODED` | Time of Week decoded from nav message — **pseudorange usable** |
+| 4 | 16 | `STATE_MSEC_AMBIGUOUS` | Millisecond-level ambiguity exists |
+| 5 | 32 | `STATE_SYMBOL_SYNC` | Symbol sync achieved |
+| 6 | 64 | `STATE_GLO_STRING_SYNC` | GLONASS string boundary synced |
+| 7 | 128 | `STATE_GLO_TOD_DECODED` | GLONASS Time of Day decoded — **GLO pseudorange usable** |
+| 8 | 256 | `STATE_BDS_D2_BIT_SYNC` | BeiDou D2 bit sync |
+| 9 | 512 | `STATE_BDS_D2_SUBFRAME_SYNC` | BeiDou D2 subframe sync |
+| 10 | 1024 | `STATE_GAL_E1BC_CODE_LOCK` | Galileo E1BC code locked |
+| 11 | 2048 | `STATE_GAL_E1C_2ND_CODE_LOCK` | Galileo E1C secondary code locked |
+| 12 | 4096 | `STATE_GAL_E1B_PAGE_SYNC` | Galileo E1B page synced |
+| 13 | 8192 | `STATE_SBAS_SYNC` | SBAS message synced |
+| 14 | 16384 | `STATE_TOW_KNOWN` | TOW known by injection — **pseudorange usable** |
+| 15 | 32768 | `STATE_GLO_TOD_KNOWN` | GLONASS TOD known by injection — **GLO pseudorange usable** |
+
+**Usability rule:** `(State & 8) != 0` OR `(State & 16384) != 0` (for GPS/BDS/GAL/QZSS)
+or `(State & 128) != 0` OR `(State & 32768) != 0` (for GLONASS).
+
+---
+
+### 1.4 Satellite Time and Signal Quality Fields
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `ReceivedSvTimeNanos` | int | ns | **Satellite transmit time** as measured by the receiver. Interpretation varies by constellation — see Section 1.7. |
+| `ReceivedSvTimeUncertaintyNanos` | float | ns | 1-sigma uncertainty on `ReceivedSvTimeNanos`. Larger values = noisy code phase. |
+| `Cn0DbHz` | float | dB-Hz | **Carrier-to-Noise density ratio** at the correlator output. The primary signal quality metric. |
+| `BasebandCn0DbHz` | float | dB-Hz | CN0 measured at baseband before correlation processing. Generally 2–5 dB-Hz lower than `Cn0DbHz`. |
+
+**CN0 quality interpretation:**
+
+| CN0 (dB-Hz) | Quality |
+|-------------|---------|
+| < 20 | Poor — marginal tracking, may lose lock |
+| 20–25 | Moderate — basic tracking, noisy pseudorange |
+| 25–35 | Good — typical open-sky signal |
+| 35–45 | Excellent — clear sky with no obstructions |
+| > 45 | Outstanding — rare for L1 C/A; near theoretical ceiling |
+
+---
+
+### 1.5 Pseudorange Rate Fields
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `PseudorangeRateMetersPerSecond` | float | m/s | **Doppler-derived range rate**: rate of change of distance between receiver and satellite. Used for velocity computation. Negative = satellite approaching, positive = receding. |
+| `PseudorangeRateUncertaintyMetersPerSecond` | float | m/s | 1-sigma uncertainty on the range rate. Values > 1 m/s indicate poor tracking. |
+
+**Note on PRR clamping:** Some modem-integrated chipsets clamp `PseudorangeRateMetersPerSecond`
+at ±500 m/s due to firmware limitations. Rows clamped at exactly ±500.0 m/s should be
+excluded from velocity computation.
+
+---
+
+### 1.6 Carrier Phase (ADR) Fields
+
+Accumulated Delta Range (ADR) is the integrated carrier phase in metres. It is only
+meaningful if the `AccumulatedDeltaRangeState` bitmask indicates valid tracking.
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `AccumulatedDeltaRangeState` | int | bitmask | Carrier-phase tracking status — see bitmask table below. |
+| `AccumulatedDeltaRangeMeters` | float | m | Integrated carrier phase change since last reset (metres = cycles × wavelength). Only valid if `ADR_STATE_VALID` is set. |
+| `AccumulatedDeltaRangeUncertaintyMeters` | float | m | 1-sigma uncertainty on the ADR. |
+
+**AccumulatedDeltaRangeState bitmask:**
+
+| Bit | Value | Flag name | Meaning |
+|-----|------:|-----------|---------|
+| 0 | 1 | `ADR_STATE_VALID` | ADR is valid. **Must be set for carrier phase to be usable.** |
+| 1 | 2 | `ADR_STATE_RESET` | ADR was reset (cycle count restarted). Phase continuity broken. |
+| 2 | 4 | `ADR_STATE_CYCLE_SLIP` | A cycle slip was detected. Phase continuity broken. |
+| 3 | 8 | `ADR_STATE_HALF_CYCLE_RESOLVED` | Half-cycle ambiguity has been resolved. |
+| 4 | 16 | `ADR_STATE_HALF_CYCLE_REPORTED` | Half-cycle ambiguity is reported but not resolved. |
+
+**ADR usability rule:**
+- Bit 0 (`ADR_STATE_VALID`) **must** be set.
+- Bits 1 and 2 (`ADR_STATE_RESET`, `ADR_STATE_CYCLE_SLIP`) **must not** be set.
+- Bit 4 alone (`ADR_STATE_HALF_CYCLE_REPORTED` = 16, no VALID) → **not valid**.
+  Many chipsets (especially Sony/Qualcomm MPSS.DE) report state=16 — the chip
+  tracks carrier phase internally but the HAL driver does not certify it as valid.
+
+---
+
+### 1.7 Automatic Gain Control
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `AgcDb` | float | dB | **Automatic Gain Control** level. A proxy for RF interference and jamming. Nominally 0 dB; large negative values indicate the AGC is attenuating the input due to strong interference. |
+
+Not all chipsets expose AgcDb in `Raw` rows; some expose it only through `Agc` rows.
+If the column is present and non-zero for most measurements, the RF environment is
+stable. All-zero or absent means the chipset does not report AGC here.
+
+---
+
+### 1.8 Satellite Ephemeris Fields
+
+These fields contain the satellite's state vector and clock correction as broadcast
+by the satellite's navigation message and decoded by the chipset.
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `SvPositionEcefXMeters` | float | m | Satellite X position in Earth-Centred Earth-Fixed (ECEF) frame |
+| `SvPositionEcefYMeters` | float | m | Satellite Y position in ECEF |
+| `SvPositionEcefZMeters` | float | m | Satellite Z position in ECEF |
+| `SvVelocityEcefXMetersPerSecond` | float | m/s | Satellite X velocity in ECEF |
+| `SvVelocityEcefYMetersPerSecond` | float | m/s | Satellite Y velocity in ECEF |
+| `SvVelocityEcefZMetersPerSecond` | float | m/s | Satellite Z velocity in ECEF |
+| `SvClockBiasMeters` | float | m | Satellite clock error in metres (= satellite clock bias × speed of light). **Must be ADDED to the raw pseudorange** (not subtracted) to correct for satellite clock error. |
+| `SvClockDriftMetersPerSecond` | float | m/s | Rate of change of satellite clock error in m/s. |
+
+---
+
+### 1.9 Inter-Signal Bias Fields
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `FullInterSignalBiasNanos` | float | ns | Inter-signal bias between this signal and the GPS L1 C/A reference signal. Used for multi-frequency pseudorange alignment. |
+| `FullInterSignalBiasUncertaintyNanos` | float | ns | 1-sigma uncertainty on the ISB. |
+| `SatelliteInterSignalBiasNanos` | float | ns | Satellite-reported (broadcast) inter-signal bias. |
+| `SatelliteInterSignalBiasUncertaintyNanos` | float | ns | 1-sigma uncertainty on the satellite ISB. |
+
+---
+
+### 1.10 Ionospheric Correction Coefficients
+
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `KlobucharAlpha0` through `KlobucharAlpha3` | float | varies | Alpha coefficients of the GPS Klobuchar ionospheric model (broadcast in GPS LNAV subframe 4). Used to estimate single-frequency ionospheric delay. |
+| `KlobucharBeta0` through `KlobucharBeta3` | float | varies | Beta coefficients of the Klobuchar model. |
+
+These are shared across all GPS satellites in the same epoch (identical values per epoch).
+Presence indicates the receiver has decoded the ionospheric model from the nav message.
+
+---
+
+### 1.11 Pseudorange Computation Algorithm
+
+The geometric pseudorange (in metres) is computed as:
 
 ```
-pseudorange = (ReceivedTime - SatelliteTransmitTime) × speed_of_light
+t_rx  = TimeNanos - (FullBiasNanos + BiasNanos)     # receiver time in GPS nanoseconds
+sv_t  = ReceivedSvTimeNanos                          # satellite transmit time (ns)
+
+# Constellation-specific adjustments to sv_t:
+#   GPS / Galileo / QZSS:  sv_t is already GPS week time (ns within week)
+#   BeiDou:                sv_t is BDS TOW = GPS TOW - 14 s
+#                          → use  sv_t_gps = sv_t + 14 × 10⁹
+#   GLONASS:               sv_t is GLONASS Time of Day (TOD)
+#                          → t_mod = (t_rx + 10782 × 10⁹) mod 86400 × 10⁹
+#                            then  dt = t_mod - sv_t
+
+dt           = t_rx_mod - sv_t                       # signal travel time (ns)
+pseudorange  = dt × 1e-9 × c                         # metres (c = 299 792 458 m/s)
+
+# Apply satellite clock correction:
+pseudorange_corrected = pseudorange + SvClockBiasMeters
 ```
 
-Where:
-- `ReceivedTime` = `TimeNanos – (FullBiasNanos + BiasNanos)` (GPS time at receiver)
-- `SatelliteTransmitTime` = `ReceivedSvTimeNanos` (GPS time at satellite)
+**Note on GPS week rollover:** `t_rx` is in GPS nanoseconds since the GPS epoch.
+`ReceivedSvTimeNanos` is within the current GPS week (modulo 604800 × 10⁹ ns).
+To avoid week-boundary errors, work with `t_rx mod (604800 × 10⁹)` for GPS/BDS/GAL/QZSS.
 
-The raw pseudorange is ~20 000–40 000 km — the actual geometric distance plus
-clock offsets and atmospheric delays.
-
-### Constellation breakdown in this log
-
-| Constellation | Filtered measurements | Typical CN0 |
-|--------------|----------------------:|-------------|
-| GPS | ~120 | 19–26 dB-Hz |
-| GLONASS | ~60 | 18–25 dB-Hz |
-| BeiDou | ~80 | 16–31 dB-Hz |
-| Galileo | ~30 | 17–23 dB-Hz |
-| QZSS | ~20 | 21–26 dB-Hz |
+**Note on per-constellation clock offsets:** GPS, QZSS, and Galileo share the same
+timescale (to within a few ns). BeiDou and GLONASS have independent clocks.
+When solving the navigation equations with mixed constellations, use a separate
+receiver clock offset per constellation group (GPS+QZSS+GAL, BDS, GLO), or
+inter-system biases will appear as ~600 m errors in residuals.
 
 ---
 
 ## 2. `Status` Rows — Satellite Visibility Status
 
-### What they represent
-One `Status` block is emitted per GNSS epoch (every ~1 second). Each block
-contains one row **per visible satellite signal** (regardless of whether that
-satellite is tracked or used in the fix). These rows come from the Android
-`GnssStatus` API.
+### What They Represent
 
-### Column explanations
+One `Status` block is emitted per GNSS epoch (approximately every 1 second). Each
+block contains one row per visible satellite signal (regardless of whether that
+satellite is tracked or used in the position fix). These rows come from the Android
+`GnssStatus` API and provide the sky view for plotting.
 
-| Column | Example | Meaning |
-|--------|---------|---------|
-| `UnixTimeMillis` | (often blank) | Epoch timestamp; may be empty if derived from system time |
-| `SignalCount` | 49 | Total number of satellite signals in this epoch's snapshot |
-| `SignalIndex` | 0–48 | Index of this signal within the epoch block |
-| `ConstellationType` | 1 | 1=GPS, 3=GLONASS, 4=QZSS, 5=BeiDou, 6=Galileo |
-| `Svid` | 8 | Satellite vehicle ID |
-| `CarrierFrequencyHz` | 1575420000 | Signal frequency |
-| `Cn0DbHz` | 13.6 | Signal strength (carrier-to-noise ratio) |
-| `AzimuthDegrees` | 287.0 | Satellite azimuth from North (0–360°), clockwise |
-| `ElevationDegrees` | 12.0 | Satellite elevation above horizon (0–90°) |
-| `UsedInFix` | 1 | 1 = this satellite was used in the current position fix, 0 = tracked only |
-| `HasAlmanacData` | 1 | Whether the receiver has almanac data for this satellite |
-| `HasEphemerisData` | 0 | Whether the receiver has full ephemeris (precise orbit) data |
-| `BasebandCn0DbHz` | 10.1 | Baseband-only CN0 |
+### Column Reference
 
-### Satellite counts in this log
-
-| Constellation | Signals tracked | Signals used in fix |
-|--------------|----------------:|--------------------:|
-| GPS | 540 epochs-signals | 197 |
-| GLONASS | 360 | 113 |
-| BeiDou | 765 | 55 |
-| Galileo | 495 | 59 |
-| QZSS | 45 | 43 |
-
-Up to **49 signals** were tracked in a single epoch, with roughly **10 used in fix**.
-Elevation angles ranged from 0° to 76° with a mean of ~30°.
+| Column | Type | Description |
+|--------|------|-------------|
+| `UnixTimeMillis` | int | Epoch timestamp in Unix milliseconds. May be blank on some devices. |
+| `SignalCount` | int | Total number of satellite signals in this epoch's snapshot. |
+| `SignalIndex` | int | Index of this signal within the epoch block (0 to SignalCount−1). |
+| `ConstellationType` | int | 1=GPS, 3=GLONASS, 4=QZSS, 5=BeiDou, 6=Galileo, 7=NavIC |
+| `Svid` | int | Satellite vehicle ID (same encoding as Raw rows). |
+| `CarrierFrequencyHz` | float | Carrier frequency in Hz (same encoding as Raw rows). |
+| `Cn0DbHz` | float | Signal strength in dB-Hz. Same as in Raw rows. |
+| `AzimuthDegrees` | float | Satellite azimuth measured clockwise from geographic North (0–360°). |
+| `ElevationDegrees` | float | Satellite elevation above the horizon (0–90°). |
+| `UsedInFix` | int | 1 = this satellite was used in the current position fix; 0 = tracked but not used. |
+| `HasAlmanacData` | int | 1 = receiver has almanac (coarse orbit) data for this satellite. |
+| `HasEphemerisData` | int | 1 = receiver has full ephemeris (precise orbit) data — required to use satellite in fix. |
+| `BasebandCn0DbHz` | float | Baseband-level CN0. Generally 2–5 dB-Hz lower than `Cn0DbHz`. |
 
 ---
 
 ## 3. `Fix` Rows — Android Position Fixes
 
-### What they represent
-These rows come from Android's `LocationManager` API, not directly from the
-chip. The OS fuses multiple sources to produce the best estimate of position.
+### What They Represent
 
-### Providers observed
+`Fix` rows come from Android's `LocationManager` API. The OS can fuse GNSS, Wi-Fi,
+cell towers, and IMU data into a position estimate. Multiple providers may produce
+concurrent fixes.
 
-| Provider | Count | What it is |
-|----------|------:|-----------|
-| `GPS` | 45 | Pure GNSS solution computed from satellite ranging — most accurate when sky is open |
-| `FLP` | 46 | Fused Location Provider — Android's sensor fusion combining GNSS + accelerometer + gyroscope + barometer |
-| `NLP` | 4 | Network Location Provider — Wi-Fi / cell-tower triangulation when GNSS is unavailable or weak |
+### Provider Types
 
-### Column explanations
+| Provider | Description |
+|----------|-------------|
+| `GPS` | Pure GNSS solution computed from satellite ranging. Most accurate outdoors. |
+| `FLP` | Fused Location Provider — Android's sensor-fusion engine combining GNSS, accelerometer, gyroscope, and sometimes barometer. Generally tracks GPS very closely; adds dead-reckoning during GNSS outages. |
+| `NLP` | Network Location Provider — position from Wi-Fi AP database lookup or cell-tower triangulation. Accuracy 10–1000 m depending on infrastructure density. |
+| `PASSIVE` | Receives fixes produced by other apps without triggering hardware independently. |
 
-| Column | Example | Meaning |
-|--------|---------|---------|
-| `Provider` | GPS | Location source |
-| `LatitudeDegrees` | 13.0667 | WGS-84 latitude |
-| `LongitudeDegrees` | 77.5917 | WGS-84 longitude |
-| `AltitudeMeters` | 837.4 | Ellipsoidal altitude (WGS-84) |
-| `SpeedMps` | 0.0–1.08 | Horizontal speed in m/s |
-| `AccuracyMeters` | 6.5–14.6 | 68th-percentile horizontal accuracy radius (1-sigma) |
-| `BearingDegrees` | 45.0 | Heading in degrees from North |
-| `UnixTimeMillis` | 1772042138000 | Fix timestamp (Unix epoch ms) |
-| `SpeedAccuracyMps` | 0.8–1.5 | 1-sigma speed accuracy |
-| `BearingAccuracyDegrees` | 45.0 | 1-sigma bearing accuracy |
-| `elapsedRealtimeNanos` | 6567087... | Time since boot when fix was computed |
-| `VerticalAccuracyMeters` | 1.06–5.79 | 1-sigma vertical accuracy |
-| `MockLocation` | 0 | 1 = fake/spoofed location; 0 = genuine |
-| `NumberOfUsedSignals` | (blank here) | Number of satellite signals used |
-| `SolutionType` | (blank here) | 0=GNSS-only, 1=DGNSS, 2=RTK-fixed, etc. |
+### Column Reference
 
-### Position statistics
-
-| Provider | Fixes | Lat spread | Lon spread | Mean accuracy |
-|----------|------:|-----------|-----------|--------------|
-| GPS | 45 | 0.000023° (~2.5 m) | 0.000007° (~0.7 m) | 10.9 m |
-| FLP | 46 | 0.000056° (~6.2 m) | 0.000025° (~2.5 m) | 11.8 m |
-| NLP | 4 | 0.000015° (~1.7 m) | 0.000009° (~0.9 m) | 12.8 m |
-
-The phone was **stationary** (speeds ≈0 m/s). The position scatter is therefore
-a direct measure of fix noise, not true motion.
+| Column | Type | Units | Description |
+|--------|------|-------|-------------|
+| `Provider` | string | — | Location source (`gps`, `fused`, `network`, `passive`) |
+| `LatitudeDegrees` | float | ° | WGS-84 geodetic latitude, positive North |
+| `LongitudeDegrees` | float | ° | WGS-84 longitude, positive East |
+| `AltitudeMeters` | float | m | **Ellipsoidal altitude above WGS-84 reference ellipsoid**, not above sea level. To get MSL altitude: add the geoid separation (from NMEA GGA). |
+| `SpeedMps` | float | m/s | Horizontal ground speed |
+| `AccuracyMeters` | float | m | **68th-percentile (1-sigma) horizontal accuracy radius**. 68% of fixes are expected within this radius of the true position. |
+| `BearingDegrees` | float | ° | True heading from North (0–360°), clockwise. Meaningful only when moving. |
+| `UnixTimeMillis` | int | ms | Fix timestamp in Unix milliseconds (UTC) |
+| `SpeedAccuracyMps` | float | m/s | 1-sigma speed accuracy |
+| `BearingAccuracyDegrees` | float | ° | 1-sigma bearing accuracy |
+| `elapsedRealtimeNanos` | int | ns | Monotonic system time (since boot) when fix was computed — not affected by wall-clock changes |
+| `VerticalAccuracyMeters` | float | m | 1-sigma vertical (altitude) accuracy |
+| `MockLocation` | int | — | 1 = fake/spoofed location (testing); 0 = genuine |
+| `NumberOfUsedSignals` | int | — | Number of satellite signals used in this fix (may be blank on older HALs) |
+| `SolutionType` | int | — | 0=GNSS-only, 1=DGNSS, 2=RTK-fixed, 3=RTK-float, 4=PPP. Often blank. |
 
 ---
 
 ## 4. IMU Rows — Inertial Measurement Unit
 
-### `UncalAccel` — Uncalibrated Accelerometer (4 841 rows, ~100 Hz)
+IMU sensors log at approximately 100 Hz on most Android devices. They are synchronised
+with GNSS time via `utcTimeMillis`.
 
-Measures specific force (gravity + motion) on three axes.
+### `UncalAccel` — Uncalibrated Accelerometer
 
-| Column | Meaning |
-|--------|---------|
-| `UncalAccelXMps2` | Raw X-axis acceleration in m/s² |
-| `UncalAccelYMps2` | Raw Y-axis acceleration in m/s² |
-| `UncalAccelZMps2` | Raw Z-axis acceleration in m/s² |
-| `BiasX/Y/ZMps2` | Estimated bias offsets (0 if not yet calibrated) |
-| `CalibrationAccuracy` | 3 = HIGH accuracy |
+Measures **specific force** (gravity + linear acceleration) on three body axes.
 
-Typical values here: X≈3.8, Y≈4.7, Z≈7.9 m/s² — the device was held at an
-angle (not flat), and the magnitude ≈ √(3.8²+4.7²+7.9²) ≈ 9.8 m/s² = gravity.
-This confirms the phone was **stationary and tilted**.
+| Column | Units | Description |
+|--------|-------|-------------|
+| `UncalAccelXMps2` | m/s² | Raw X-axis specific force (before hard-iron / scale-factor correction) |
+| `UncalAccelYMps2` | m/s² | Raw Y-axis specific force |
+| `UncalAccelZMps2` | m/s² | Raw Z-axis specific force |
+| `BiasXMps2` | m/s² | Estimated accelerometer bias on X (0 until calibrated) |
+| `BiasYMps2` | m/s² | Estimated accelerometer bias on Y |
+| `BiasZMps2` | m/s² | Estimated accelerometer bias on Z |
+| `CalibrationAccuracy` | int | 0=UNCALIBRATED, 1=LOW, 2=MEDIUM, 3=HIGH |
 
-### `UncalGyro` — Uncalibrated Gyroscope (4 840 rows, ~100 Hz)
+For a stationary device, the magnitude √(X² + Y² + Z²) should equal local gravitational
+acceleration (~9.8 m/s²). Deviations indicate non-stationary motion.
 
-Measures angular velocity around three axes.
+### `UncalGyro` — Uncalibrated Gyroscope
 
-| Column | Meaning |
-|--------|---------|
-| `UncalGyroX/Y/ZRadPerSec` | Raw rotation rate in radians/second |
-| `DriftX/Y/ZRadPerSec` | Estimated drift (gyroscope bias). Here ≈ ±0.002 rad/s = very low drift |
-| `CalibrationAccuracy` | 3 = HIGH |
+Measures **angular velocity** around three body axes.
 
-Values here are very small (~0.01–0.12 rad/s) consistent with a nearly
-stationary phone with minor hand tremor.
+| Column | Units | Description |
+|--------|-------|-------------|
+| `UncalGyroXRadPerSec` | rad/s | Raw angular velocity around X axis |
+| `UncalGyroYRadPerSec` | rad/s | Raw angular velocity around Y axis |
+| `UncalGyroZRadPerSec` | rad/s | Raw angular velocity around Z axis |
+| `DriftXRadPerSec` | rad/s | Estimated gyroscope drift (bias) on X |
+| `DriftYRadPerSec` | rad/s | Estimated drift on Y |
+| `DriftZRadPerSec` | rad/s | Estimated drift on Z |
+| `CalibrationAccuracy` | int | 0=UNCALIBRATED to 3=HIGH |
 
-### `UncalMag` — Uncalibrated Magnetometer (4 523 rows, ~100 Hz)
+Values near zero confirm a stationary device. Non-zero drift values indicate successful
+in-field bias estimation.
 
-Measures ambient magnetic field in micro-Teslas.
+### `UncalMag` — Uncalibrated Magnetometer
 
-| Column | Meaning |
-|--------|---------|
-| `UncalMagX/Y/ZMicroT` | Raw magnetic field on each axis (µT) |
-| `BiasX/Y/ZMicroT` | Hard-iron bias estimated by Android |
-| `CalibrationAccuracy` | 3 = HIGH |
+Measures the **ambient magnetic field** on three body axes.
 
-Z component is ≈ –230 µT — the strong downward component is the Earth's
-magnetic field in Bangalore (inclination ≈ −20°). X≈61, Y≈−22 µT are the
-horizontal components. Total magnitude ≈ 239 µT, consistent with Earth's field
-at this location.
+| Column | Units | Description |
+|--------|-------|-------------|
+| `UncalMagXMicroT` | µT | Raw magnetic field on X axis |
+| `UncalMagYMicroT` | µT | Raw magnetic field on Y axis |
+| `UncalMagZMicroT` | µT | Raw magnetic field on Z axis |
+| `BiasXMicroT` | µT | Estimated hard-iron bias on X |
+| `BiasYMicroT` | µT | Estimated hard-iron bias on Y |
+| `BiasZMicroT` | µT | Estimated hard-iron bias on Z |
+| `CalibrationAccuracy` | int | 0=UNCALIBRATED to 3=HIGH |
 
-### `OrientationDeg` — Fused Orientation (4 838 rows, ~100 Hz)
+The Earth's field magnitude varies by location (25–65 µT). The Z-component is typically
+the largest at mid-latitudes due to the field dip angle. Compare to WMM2025 model values
+for the recording location to verify sensor calibration.
 
-| Column | Meaning |
-|--------|---------|
-| `yawDeg` | Azimuth (heading) from magnetic North: ~76–79° → phone faces roughly East |
-| `rollDeg` | Roll: ~−25° → tilted 25° to the left |
-| `pitchDeg` | Pitch: ~−28° → tilted 28° backward |
+### `OrientationDeg` — Fused Orientation
 
-### `GameRotationVector` — Rotation Quaternion (~4 800 rows)
+| Column | Units | Description |
+|--------|-------|-------------|
+| `yawDeg` | ° | Azimuth (compass heading): angle from geographic North, 0–360° clockwise |
+| `rollDeg` | ° | Roll: rotation around the front-to-back axis (positive = right side down) |
+| `pitchDeg` | ° | Pitch: rotation around the left-right axis (positive = top tilted away from user) |
 
-Quaternion (x, y, z, w) representing device orientation relative to an
-arbitrary initial reference (no magnetic north). Used in games / AR. Values
-here: w ≈ 0.63, confirming a roughly 52° total rotation from the neutral pose.
+### `GameRotationVector` — Rotation Quaternion
+
+Orientation expressed as a unit quaternion (x, y, z, w) relative to an arbitrary
+initial reference frame. Unlike `OrientationDeg`, this does not use the magnetometer
+and therefore has no geographic North reference, but it avoids magnetic disturbances.
 
 ---
 
 ## 5. `Nav` Rows — Navigation Messages
 
-**Count: 0 in this log.** The `Nav` row type records raw binary navigation
-message frames as they are decoded from the satellite downlink. On many modern
-Android devices (including this Qualcomm chipset) these are not exposed by the
-driver, so no Nav rows appear.
+`Nav` rows contain **raw binary navigation message frames** decoded from the satellite
+downlink. Format: `Nav,<constellation>,<svid>,<type>,<status>,<messageId>,<submessageId>,<data>`.
+
+Most modern Android chipsets do not expose Nav rows to the HAL — the driver decodes
+the messages internally for ephemeris computation but does not forward them to the app.
+If Nav rows are absent, this is normal behaviour, not a data loss.
 
 ---
 
-## 6. `Agc` Rows — Automatic Gain Control
+## 6. `Agc` Rows — Per-Constellation AGC
 
-**Count: 0 in this log.** AGC records interference/jamming indicators per
-constellation. Not all chipsets expose these; this device does not.
+`Agc` rows provide Automatic Gain Control readings per GNSS constellation:
+`Agc,<utcTimeMillis>,<constellation>,<carrierFreq>,<agcLevelDb>`.
 
----
-
-## Key Takeaways from the TXT File
-
-1. **The phone was stationary and tilted** (~25–28° from vertical), held in
-   hand, outdoors in Bangalore.
-2. **Five GNSS constellations** were tracked simultaneously, with 10 signals
-   typically used in each fix.
-3. **Clock bias uncertainty of 75–129 ns** is characteristic of mid-range
-   Qualcomm modems and requires relaxed filtering thresholds.
-4. **IMU data at ~100 Hz** is synchronised with GNSS, enabling tight sensor
-   fusion.
-5. **Position fixes are stable to within ~2–6 m** in both GPS-only and fused
-   modes for a stationary receiver.
+These are distinct from the `AgcDb` column in `Raw` rows. Not all chipsets expose `Agc`
+rows. If both `Agc` rows and `Raw.AgcDb` are present, they measure the same quantity;
+use whichever is more complete.
 
 ---
 
-## Log2 Differences (Sony XQ-GE54, Qualcomm MPSS.DE.9.0)
+## 7. Key Parsing Notes
 
-The same GnssLogger `.txt` format is used for Log2, but several fields differ
-significantly due to the different chipset and better environment.
+### Column index vs column name
+Always parse column headers from the `# Raw,` comment line — do not hard-code column
+indices. The column count changes between GnssLogger versions (the app added several
+columns in v3.x).
 
-| Field | Log1 (Xiaomi 13) | Log2 (Sony XQ-GE54) |
-|-------|:----------------:|:-------------------:|
-| `Raw` row count | 311 | 7181 |
-| Session duration | 44 s | 129 s |
-| `BiasUncertaintyNanos` | 75–129 ns | **4.6–6.5 ns** |
-| Analysis threshold | Relax to 200 ns | Standard 40 ns fine |
-| `Cn0DbHz` mean | 23.4 dBHz | **38.1 dBHz** |
-| `AccumulatedDeltaRangeState` | **0** (nothing) | **16** (half-cycle reported, not valid) |
-| BeiDou `CarrierFrequencyHz` | 1561098000 (B1I only) | 1561098000 (B1I) **+ 1575420000 (B1C)** |
-| `PseudorangeRateMetersPerSecond` | Clamped at ±500 m/s (6.8% rows) | No clamping |
-| GPS L5 (1176450000 Hz) | Absent | Absent |
-| IMU rows | Yes (~100 Hz) | Yes (~100 Hz) |
-| `Fix` providers | GPS, FLP, NLP | GPS, FLP, NLP |
-| Reported GPS Hacc | 10.9 m | **3.8 m** |
+### Filtering criteria for valid measurements
+A measurement should be included in analysis only if **all** of the following hold:
+1. `BiasUncertaintyNanos` ≤ threshold (40 ns standard; 200 ns for MPSS.HI chipsets)
+2. `State` has `STATE_TOW_DECODED` (bit 3) or `STATE_TOW_KNOWN` (bit 14) set
+   — or `STATE_GLO_TOD_DECODED` (bit 7) / `STATE_GLO_TOD_KNOWN` (bit 15) for GLONASS
+3. `ReceivedSvTimeUncertaintyNanos` is reasonably small (< 500 ns is a common threshold)
 
-**Key Log2 parsing notes:**
-- `BiasUncertaintyNanos` of 4.6–6.5 ns: no threshold relaxation needed.
-- BeiDou rows have **two distinct `CarrierFrequencyHz` values** per satellite —
-  filter by frequency to separate B1I from B1C measurements.
-- `AccumulatedDeltaRangeState = 16` = bit 4 set (`ADR_STATE_HALF_CYCLE_REPORTED`)
-  but bit 0 NOT set (`ADR_STATE_VALID`) → treat as no valid ADR.
+### SvClockBiasMeters sign convention
+`SvClockBiasMeters` must be **added** to the raw pseudorange. The value is positive
+when the satellite clock is ahead of GPS time; adding it to the pseudorange shortens
+it (corrects the overestimated range). This is the opposite of the sign convention in
+some textbooks that define the satellite clock error as a subtraction.
+
+### BeiDou time system
+BeiDou System Time (BDT) is offset from GPS Time by exactly 14 seconds:
+`BDT = GPS_time − 14 s`. When computing BeiDou pseudoranges, the satellite transmit
+time (`ReceivedSvTimeNanos`) is in BDT (= GPS TOW − 14 × 10⁹ ns). Adjust accordingly.
+
+### GLONASS time system
+GLONASS uses its own time scale (GLONASS Time, offset from UTC by leap seconds but
+referenced differently from GPS). `ReceivedSvTimeNanos` for GLONASS is **Time of Day**
+in the GLONASS time frame, not GPS week time. Conversion:
+```
+t_glo_ns = t_rx_gps_ns + 10782 × 10⁹   # approximate constant offset to GLONASS epoch
+t_mod    = t_glo_ns mod (86400 × 10⁹)  # GLONASS TOD in nanoseconds
+dt       = t_mod - ReceivedSvTimeNanos
+```
+
+### Multi-constellation receiver clock
+When solving for position with mixed constellations, use a separate receiver clock offset
+parameter for each constellation group. GPS/QZSS/Galileo share the same timescale and
+can use a common offset. BeiDou and GLONASS each have their own offsets. Forcing a single
+receiver clock across all constellations introduces ~600 m errors in the residuals.
+
+---
+
+## 8. Annotated Examples
+
+### 8.1 File Header (first lines of .txt)
+
+```
+# GnssLogger Version: 3.1.1.2
+# Start: 2026-03-10T08:30:00.000Z
+# manufacturer: Google
+# model: Pixel 9
+# AndroidVersionRelease: 16
+# DeviceBuildVersionRelease: 16
+# Platform: Tensor G4
+# GNSS Hardware Model Name: qcom;MPSS.DE.9.1;...
+# Raw,utcTimeMillis,TimeNanos,LeapSecond,TimeUncertaintyNanos,FullBiasNanos, \
+#   BiasNanos,BiasUncertaintyNanos,DriftNanosPerSecond,...
+```
+
+Key lines to parse:
+- `manufacturer` / `model` → build the device label
+- `Platform` → chipset family; used for BiasUncNanos threshold selection
+- `GNSS Hardware Model Name` → contains the modem identifier (e.g. `MPSS.DE.9.1`)
+- `# Raw,` → defines column order for Raw rows (parse this, do not hard-code indices)
+
+---
+
+### 8.2 Raw Row — GPS L1 Satellite (high CN0, TOW decoded)
+
+```
+Raw,1772042137424,6567086705028,18,0.0,-1772042131138021376,0.31,5.2,-0.04,0.002,0,
+    23,0.0,16431,88233485714286,18,42.3,−1814.2,0.21,1,0.0,0.0,1575420000.0,1,
+    0.3,1575420000.0,0.0,...,22472891.013,0.0,0.0,5.6,0.0,0.0,C,
+    15234567.1,−21345678.2,10456789.3,...,−3.1,0.04,...
+```
+
+Annotated key fields:
+
+| Field value | Column | Interpretation |
+|-------------|--------|----------------|
+| `1772042137424` | utcTimeMillis | 2026-02-25 17:55:37.424 UTC |
+| `6567086705028` | TimeNanos | Hardware clock: ~6 567 s since boot |
+| `18` | LeapSecond | GPS ahead of UTC by 18 s |
+| `0.0` | TimeUncertaintyNanos | Clock fully disciplined |
+| `-1772042131138021376` | FullBiasNanos | Large negative integer; GPS epoch offset |
+| `0.31` | BiasNanos | 0.31 ns fractional correction |
+| `5.2` | BiasUncertaintyNanos | 5.2 ns — dedicated GNSS modem, well within 40 ns threshold |
+| `23` | Svid | GPS PRN 23 |
+| `16431` | State | Binary: 100000000101111 — TOW_DECODED (bit 3) set, measurement usable |
+| `88233485714286` | ReceivedSvTimeNanos | Satellite transmit time within GPS week |
+| `18` | ReceivedSvTimeUncertaintyNanos | 18 ns uncertainty — good code lock |
+| `42.3` | Cn0DbHz | 42.3 dB-Hz — excellent signal |
+| `−1814.2` | PseudorangeRateMetersPerSecond | Satellite approaching at 1 814 m/s projected rate |
+| `0.21` | PseudorangeRateUncertaintyMps | Low uncertainty — reliable Doppler |
+| `1` | AccumulatedDeltaRangeState | Bit 0 set: ADR_STATE_VALID — carrier phase usable |
+| `1575420000.0` | CarrierFrequencyHz | 1575.42 MHz → GPS L1 C/A confirmed |
+| `1` | ConstellationType | GPS |
+| `0.3` | AgcDb | AGC near 0 — clean RF environment |
+| `C` | CodeType | C/A civil code |
+
+**State bitmask decode for `16431`:**
+```
+16431 = 0b100000000101111
+         |||||||||||||||+-- bit 0: CODE_LOCK        ✓
+         ||||||||||||||+--- bit 1: BIT_SYNC          ✓
+         |||||||||||||+---- bit 2: SUBFRAME_SYNC     ✓
+         ||||||||||||+----- bit 3: TOW_DECODED       ✓  ← usable
+         |||||||||||+------ bit 4: MSEC_AMBIGUOUS    ✗
+         ||||||||||+------- bit 5: SYMBOL_SYNC       ✗
+         ...
+         |+----------------- bit 13: (reserved)     ✗
+         +------------------ bit 14: TOW_KNOWN       ✓  ← also usable
+```
+Conclusion: pseudorange is usable (TOW_DECODED set).
+
+---
+
+### 8.3 Raw Row — BeiDou B1C (State with TOW_KNOWN)
+
+```
+Raw,1772042137424,6567086705028,18,0.0,-1772042131138021376,0.31,5.2,...,
+    19,0.0,49152,70155485714286,22,39.8,−621.4,0.18,0,0.0,0.0,1575420000.0,5,...,C
+```
+
+| Field value | Column | Interpretation |
+|-------------|--------|----------------|
+| `19` | Svid | BeiDou satellite B19 (MEO) |
+| `49152` | State | Binary: 1100000000000000 — bits 14 and 15 set (TOW_KNOWN + GLO_TOD_KNOWN) ← usable |
+| `70155485714286` | ReceivedSvTimeNanos | BDS TOW — must add 14×10⁹ before pseudorange calculation |
+| `39.8` | Cn0DbHz | 39.8 dB-Hz — very good |
+| `1575420000.0` | CarrierFrequencyHz | 1575.42 MHz → B1C (not B1I) |
+| `5` | ConstellationType | BeiDou |
+| `0` | AccumulatedDeltaRangeState | No valid ADR |
+
+---
+
+### 8.4 Raw Row — GLONASS L1 (ADR half-cycle reported)
+
+```
+Raw,1772042137424,6567086705028,18,0.0,...,
+    9,0.0,128,57443200000000,31,35.1,+934.7,0.25,16,−1843.221,0.003,1602562500.0,3,...
+```
+
+| Field value | Column | Interpretation |
+|-------------|--------|----------------|
+| `9` | Svid | GLONASS orbital slot R09 |
+| `128` | State | Bit 7 set: GLO_TOD_DECODED ← usable |
+| `57443200000000` | ReceivedSvTimeNanos | GLONASS Time of Day in ns (not GPS week time) |
+| `35.1` | Cn0DbHz | 35.1 dB-Hz — good |
+| `+934.7` | PseudorangeRateMetersPerSecond | Positive: satellite receding |
+| `16` | AccumulatedDeltaRangeState | Bit 4: ADR_STATE_HALF_CYCLE_REPORTED only — NOT valid |
+| `−1843.221` | AccumulatedDeltaRangeMeters | Value present but not usable (state not VALID) |
+| `1602562500.0` | CarrierFrequencyHz | 1602.5625 MHz = 1602 + (1×0.5625) → GLONASS channel k=+1 |
+| `3` | ConstellationType | GLONASS |
+
+GLONASS pseudorange computation requires the TOD-to-GPS-time conversion:
+```
+t_rx_gps  = TimeNanos - (FullBiasNanos + BiasNanos)          # receiver time (GPS ns)
+t_glo_ns  = t_rx_gps + 10782_000_000_000                     # shift to GLONASS epoch
+t_mod     = t_glo_ns % 86_400_000_000_000                    # GLONASS TOD (ns)
+dt        = t_mod - ReceivedSvTimeNanos                       # signal travel time (ns)
+pseudorange = dt * 1e-9 * 299_792_458                        # metres
+```
+
+---
+
+### 8.5 Status Row Block (one epoch, four satellites shown)
+
+```
+# Status,UnixTimeMillis,SignalCount,SignalIndex,ConstellationType,Svid,
+#   CarrierFrequencyHz,Cn0DbHz,AzimuthDegrees,ElevationDegrees,UsedInFix,
+#   HasAlmanacData,HasEphemerisData,BasebandCn0DbHz
+
+Status,,37,0,1,23,1575420000.0,42.3,  59.0,31.0,1,1,1,38.1   ← GPS PRN23, 31° elev, used
+Status,,37,1,1,18,1575420000.0,45.1, 139.0,47.0,1,1,1,41.2   ← GPS PRN18, 47° elev, used
+Status,,37,2,3,9, 1602562500.0,35.1, 213.0,28.0,1,1,1,31.4   ← GLONASS R09, 28° elev
+Status,,37,3,5,19,1575420000.0,39.8,  88.0,62.0,1,1,1,36.1   ← BeiDou B19, 62° elev
+Status,,37,4,5,6, 1561098000.0,22.4, 172.0, 8.0,0,1,1,18.9   ← BeiDou B06 GEO, 8° elev, NOT used
+Status,,37,5,6,1, 1575420000.0,41.7, 315.0,55.0,1,1,1,38.3   ← Galileo E01, 55° elev
+...
+```
+
+Observations from this block:
+- `SignalCount=37` — 37 signals visible this epoch; high for a dedicated GNSS chipset
+- BeiDou GEO (B06 at 8° elevation) tracked (`HasEphemerisData=1`) but not used in fix
+  (`UsedInFix=0`) — low elevation + poor geometry contribution
+- GPS PRN18 at 47° has CN0 45.1 — near-excellent; high elevation, short iono path
+- `BasebandCn0DbHz` consistently 3–4 dB-Hz below `Cn0DbHz` — normal correlator processing gain
+
+---
+
+### 8.6 Fix Row — GPS Provider (stationary receiver)
+
+```
+# Fix,Provider,LatitudeDegrees,LongitudeDegrees,AltitudeMeters,SpeedMps,AccuracyMeters,
+#   BearingDegrees,UnixTimeMillis,SpeedAccuracyMps,BearingAccuracyDegrees,
+#   elapsedRealtimeNanos,VerticalAccuracyMeters,MockLocation,...
+
+Fix,gps,13.06812,77.59183,872.94,0.0,3.8,0.0,1772042137000,0.12,45.0,6567086000000,5.2,0
+```
+
+| Field | Value | Interpretation |
+|-------|-------|----------------|
+| Provider | `gps` | Pure GNSS solution |
+| Latitude | `13.06812° N` | WGS-84 |
+| Longitude | `77.59183° E` | WGS-84 |
+| AltitudeMeters | `872.94 m` | Ellipsoidal (WGS-84). Add geoid separation (~−86 m here) to get MSL: 872.94 + (−86) = **~959 m MSL** |
+| SpeedMps | `0.0` | Stationary |
+| AccuracyMeters | `3.8 m` | 1-sigma horizontal; good for single-frequency open sky |
+| BearingDegrees | `0.0` | Meaningless when stationary |
+| SpeedAccuracyMps | `0.12` | Very low — chipset confident in zero speed |
+| VerticalAccuracyMeters | `5.2 m` | ~1.4× horizontal — typical ratio for good geometry |
+| MockLocation | `0` | Genuine fix |
+
+---
+
+### 8.7 IMU Row Examples
+
+**UncalAccel — stationary phone held upright (slight tilt):**
+```
+UncalAccel,1772042137010,-0.34,5.21,8.04,0.0,0.0,0.0,3
+```
+X=−0.34, Y=5.21, Z=8.04 m/s²
+Magnitude = √(0.34² + 5.21² + 8.04²) = √(0.116 + 27.14 + 64.64) = √91.9 ≈ **9.59 m/s²**
+Close to gravity (9.8 m/s²); small deviation from tilt angle. The device is nearly
+stationary but held at ~33° from vertical (arctan(5.21/8.04) ≈ 33°).
+
+**UncalGyro — stationary phone:**
+```
+UncalGyro,1772042137010,0.003,-0.008,0.012,0.001,-0.002,0.003,3
+```
+All values near zero rad/s — confirms stationary. Drift values (0.001, −0.002, 0.003)
+show calibration has converged (CalibrationAccuracy=3=HIGH).
+
+**UncalMag — mid-latitude location:**
+```
+UncalMag,1772042137010,21.4,-8.3,-43.2,2.1,-1.4,0.8,3
+```
+Magnitude = √(21.4² + 8.3² + 43.2²) = √(458 + 69 + 1866) = √2393 ≈ **48.9 µT**
+Consistent with Earth's field strength at ~13°N latitude. Z-component dominant
+(negative = dipping downward), consistent with Southern Hemisphere dip direction
+reversal not applying here — India has positive inclination, so Z negative confirms
+phone's Z-axis points upward.
+
+---
+
+### 8.8 Pseudorange Worked Example (GPS)
+
+Given a Raw row with:
+```
+TimeNanos          = 6_567_086_705_028
+FullBiasNanos      = -1_772_042_131_138_021_376
+BiasNanos          = 0.312
+ReceivedSvTimeNanos = 88_233_485_714_286
+SvClockBiasMeters  = -3.142
+```
+
+Step 1 — Receiver GPS time:
+```
+t_rx = TimeNanos - (FullBiasNanos + BiasNanos)
+     = 6_567_086_705_028 - (-1_772_042_131_138_021_376 + 0.312)
+     = 1_772_048_698_224_753_028 - 0.312   ns (absolute GPS time since epoch)
+```
+
+Step 2 — GPS time within current week:
+```
+WEEK_NS = 604_800 × 10⁹ = 604_800_000_000_000
+t_rx_tow = t_rx mod WEEK_NS
+         ≈ 64_498_000_000_000  ns  = 64 498.0 s into the GPS week
+```
+
+Step 3 — Signal travel time:
+```
+dt = t_rx_tow - ReceivedSvTimeNanos
+   = 64_498_000_000_000 - 88_233_485_714_286
+```
+If negative (due to week-rollover near boundary), add `WEEK_NS`. Here:
+```
+   = negative → dt = 64_498_000_000_000 - 88_233_485_714_286 + WEEK_NS
+   = 580_064_514_285_714 + 604_800_000_000_000  (example showing week rollover handling)
+```
+Typical dt for GPS ≈ 67–87 ms (20 000–26 000 km / speed of light).
+
+Step 4 — Raw pseudorange:
+```
+pseudorange_raw = dt × 1e-9 × 299_792_458
+               ≈ 0.07734 × 299_792_458 ≈ 23_186_000 m  =  23 186 km
+```
+
+Step 5 — Satellite clock correction:
+```
+pseudorange_corr = pseudorange_raw + SvClockBiasMeters
+                 = 23_186_000 + (-3.142)
+                 = 23_185_996.858 m
+```
+
+The corrected pseudorange still contains ionospheric, tropospheric, and receiver clock
+errors — these are removed in the position estimation step.
