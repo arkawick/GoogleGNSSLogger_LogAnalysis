@@ -2,7 +2,7 @@
   "_meta": {
     "framework": "Google Android GNSS Quality Framework",
     "total_checks": 41,
-    "source": "Google GPS Measurement Tools / Android Bootcamp",
+    "source": "Google GPS Measurement Tools / Android Bootcamp (reference: gnss_analysis_original_reference.ipynb v2026.01.29)",
     "sections": ["BASIC_CHECKS", "TIME", "ADR_PRR_PR", "RESIDUALS"],
     "operators": {
       ">=": "measured value must be >= threshold to PASS",
@@ -28,14 +28,14 @@
       },
       "avg_gps_l1": {
         "name": "Avg Valid Per Epoch (GPS_L1)",
-        "threshold": 7.0,
+        "threshold": 7.5,
         "operator": ">=",
         "unit": "signals/epoch",
         "description": "Average number of valid GPS L1 signals per epoch"
       },
       "avg_gps_l5": {
         "name": "Avg Valid Per Epoch (GPS_L5)",
-        "threshold": 4.0,
+        "threshold": 3.5,
         "operator": ">=",
         "unit": "signals/epoch",
         "description": "Average number of valid GPS L5 signals per epoch"
@@ -56,21 +56,21 @@
       },
       "avg_gal_e5a": {
         "name": "Avg Valid Per Epoch (GAL_E5A)",
-        "threshold": 4.0,
+        "threshold": 4.5,
         "operator": ">=",
         "unit": "signals/epoch",
         "description": "Average number of valid Galileo E5A signals per epoch"
       },
       "avg_gal_e5b": {
         "name": "Avg Valid Per Epoch (GAL_E5B)",
-        "threshold": 4.0,
+        "threshold": 4.5,
         "operator": ">=",
         "unit": "signals/epoch",
         "description": "Average number of valid Galileo E5B signals per epoch"
       },
       "avg_bds_b1i": {
         "name": "Avg Valid Per Epoch (BDS_B1I)",
-        "threshold": 4.0,
+        "threshold": 5.0,
         "operator": ">=",
         "unit": "signals/epoch",
         "description": "Average number of valid BeiDou B1I signals per epoch"
@@ -128,35 +128,35 @@
       },
       "timesync_max_ms": {
         "name": "Time-sync Max Jitter",
-        "threshold": 5.0,
+        "threshold": 2.2,
         "operator": "<=",
         "unit": "ms",
         "description": "Maximum deviation of hardware clock sync from nominal 1-second intervals"
       },
       "timesync_std_ms": {
         "name": "Time-sync Jitter",
-        "threshold": 3.0,
+        "threshold": 2.5,
         "operator": "<=",
         "unit": "ms (std)",
         "description": "Standard deviation of hardware clock sync jitter across all epochs"
       },
       "elapsed_range_ms": {
         "name": "Delta ElapsedRealtimeNanos Range",
-        "threshold": 10.0,
+        "threshold": 1.0,
         "operator": "<=",
         "unit": "ms",
         "description": "Range (max - min) of delta-ElapsedRealtimeNanos across epochs"
       },
       "elapsed_std_ms": {
         "name": "Delta ElapsedRealtimeNanos Std",
-        "threshold": 3.0,
+        "threshold": 2.5,
         "operator": "<=",
         "unit": "ms (std)",
         "description": "Standard deviation of delta-ElapsedRealtimeNanos across epochs"
       },
       "clkbias_mps_std": {
         "name": "Delta Clock Bias MPS Std",
-        "threshold": 1.0,
+        "threshold": 2.0,
         "operator": "<=",
         "unit": "m/s",
         "description": "Standard deviation of receiver clock bias drift (metres per second)"
@@ -172,14 +172,14 @@
     "ADR_PRR_PR": {
       "pct_valid_adr": {
         "name": "Percent Valid ADR",
-        "threshold": 50.0,
+        "threshold": 70.0,
         "operator": ">=",
         "unit": "%",
         "description": "Percentage of measurements with ADR_STATE_VALID set (bit 0 of AccumulatedDeltaRangeState)"
       },
       "pct_usable_adr": {
         "name": "Percent Usable ADR",
-        "threshold": 80.0,
+        "threshold": 65.0,
         "operator": ">=",
         "unit": "%",
         "description": "Percentage of measurements with ADR valid and not reset or cycle-slipped"
@@ -193,28 +193,28 @@
       },
       "prr_dadr_med": {
         "name": "Median (PRR - Delta(ADR))",
-        "threshold": 0.1,
+        "threshold": 0.07,
         "operator": "<=",
         "unit": "m/s",
         "description": "Median of the difference between pseudorange rate and delta-ADR (should be ~0)"
       },
       "prr_dadr_std": {
         "name": "Std (PRR - Delta(ADR))",
-        "threshold": 0.5,
+        "threshold": 0.25,
         "operator": "<=",
         "unit": "m/s",
         "description": "Standard deviation of (PRR - delta-ADR); measures consistency between Doppler and phase"
       },
       "l1_dpr_dadr": {
         "name": "L1freq (Delta(PR) - Delta(ADR))",
-        "threshold": 0.5,
+        "threshold": 7.0,
         "operator": "<=",
         "unit": "m",
         "description": "Median absolute deviation of L1 delta-pseudorange minus delta-ADR across epochs"
       },
       "l5_dpr_dadr": {
         "name": "L5freq (Delta(PR) - Delta(ADR))",
-        "threshold": 0.5,
+        "threshold": 0.85,
         "operator": "<=",
         "unit": "m",
         "description": "Median absolute deviation of L5 delta-pseudorange minus delta-ADR across epochs"
@@ -223,28 +223,28 @@
     "RESIDUALS": {
       "l1_pr_res_std_m": {
         "name": "L1-Freq PR Residuals Std",
-        "threshold": 5.0,
+        "threshold": 6.5,
         "operator": "<=",
         "unit": "m",
-        "description": "Standard deviation of L1 pseudorange residuals after clock estimation"
+        "description": "Standard deviation of L1 pseudorange residuals after clock estimation (center 94% of data)"
       },
       "l5_pr_res_std_m": {
         "name": "L5-Freq PR Residuals Std",
-        "threshold": 3.0,
+        "threshold": 4.0,
         "operator": "<=",
         "unit": "m",
-        "description": "Standard deviation of L5 pseudorange residuals after clock estimation"
+        "description": "Standard deviation of L5 pseudorange residuals after clock estimation (center 94% of data)"
       },
       "l1_norm_rms": {
         "name": "L1-Freq Median Normalized PR Residual RMS",
-        "threshold": 3.0,
+        "threshold": 5.0,
         "operator": "<=",
         "unit": "dimensionless",
         "description": "RMS of L1 PR residuals normalized by the reported pseudorange uncertainty; should be ~1.0 if uncertainties are well-calibrated"
       },
       "l5_norm_rms": {
         "name": "L5-Freq Median Normalized PR Residual RMS",
-        "threshold": 3.0,
+        "threshold": 4.5,
         "operator": "<=",
         "unit": "dimensionless",
         "description": "RMS of L5 PR residuals normalized by the reported pseudorange uncertainty"
@@ -265,10 +265,10 @@
       },
       "adr_res_std_cyc": {
         "name": "ADR Residuals Std",
-        "threshold": 0.05,
+        "threshold": 0.079,
         "operator": "<=",
         "unit": "cycles",
-        "description": "Standard deviation of carrier-phase (ADR) residuals after clock and geometry removal"
+        "description": "Standard deviation of carrier-phase (ADR) residuals after clock and geometry removal (reference: 0.015 m at L1 = ~0.079 cycles)"
       },
       "norm_adr_rms": {
         "name": "Median Normalized ADR Residual RMS",
@@ -279,21 +279,21 @@
       },
       "pct_high_adr_ep": {
         "name": "Percent Epochs with High ADR Residuals",
-        "threshold": 10.0,
+        "threshold": 5.0,
         "operator": "<=",
         "unit": "%",
         "description": "Percentage of epochs where the ADR residual RMS exceeds 3× the median"
       },
       "prr_res_std_mps": {
         "name": "PRR Residuals Std",
-        "threshold": 0.5,
+        "threshold": 0.21,
         "operator": "<=",
         "unit": "m/s",
-        "description": "Standard deviation of pseudorange-rate (Doppler) residuals after velocity estimation"
+        "description": "Standard deviation of pseudorange-rate (Doppler) residuals after velocity estimation (center 94% of data)"
       },
       "pct_high_prr_ep": {
         "name": "Percent Epochs with High PRR Residuals",
-        "threshold": 20.0,
+        "threshold": 28.0,
         "operator": "<=",
         "unit": "%",
         "description": "Percentage of epochs where PRR residual RMS exceeds 3× the median"

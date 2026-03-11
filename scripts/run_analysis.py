@@ -6,6 +6,9 @@ Usage (from the project root):
     python scripts/run_analysis.py Log3
     python scripts/run_analysis.py Log3 --device "My Custom Label"
     python scripts/run_analysis.py Log3 --threshold 200
+    python scripts/run_analysis.py Log3 --notebook v2       # v2 only
+    python scripts/run_analysis.py Log3 --notebook ref      # reference only
+    python scripts/run_analysis.py Log3 --notebook both     # both (default)
 
 What it does automatically:
     1. Finds the gnss_log_*.txt file in <LOG_DIR>
@@ -13,12 +16,15 @@ What it does automatically:
     3. Chooses BiasUncertaintyNanos threshold:
          MPSS.HI chipsets -> 200 ns  (Snapdragon Gen 1 modem, reports 75-129 ns)
          everything else  ->  40 ns  (standard Google threshold)
-    4. Patches the config cell of gnss_quality_analysis_v2.ipynb (in a temp copy)
+    4. For each selected notebook, patches the config cell (in a temp copy)
     5. Executes the notebook via nbconvert
-    6. Saves the executed notebook to <LOG_DIR>/outputs/gnss_quality_analysis_v2_<LOG_DIR>.ipynb
-    7. Cleans up the temp copy
+    6. Saves outputs to <LOG_DIR>/outputs/
+         gnss_quality_analysis_v2_<LOG_DIR>.ipynb   (v2 notebook)
+         gnss_quality_analysis_ref_<LOG_DIR>.ipynb  (reference notebook)
+    7. Cleans up temp copies
 
-The master notebook (scripts/gnss_quality_analysis_v2.ipynb) is NEVER modified.
+The master notebooks (scripts/gnss_quality_analysis_v2.ipynb and
+scripts/gnss_analysis_ref.ipynb) are NEVER modified.
 """
 
 import argparse
@@ -32,7 +38,11 @@ from pathlib import Path
 # ── Paths ─────────────────────────────────────────────────────────────────────
 ROOT      = Path(__file__).resolve().parent.parent   # project root
 SCRIPTS   = Path(__file__).resolve().parent           # scripts/
-MASTER_NB = SCRIPTS / "gnss_quality_analysis_v2.ipynb"
+
+NOTEBOOKS = {
+    "v2":  SCRIPTS / "gnss_quality_analysis_v2.ipynb",
+    "ref": SCRIPTS / "gnss_analysis_ref.ipynb",
+}
 
 # ── Chipset -> threshold table ─────────────────────────────────────────────────
 # Add new chipset families here if needed.
@@ -84,19 +94,19 @@ def choose_threshold(chipset):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-def patch_and_execute(log_dir_name, device_label, bias_thresh, log_dir):
+def patch_and_execute(nb_key, log_dir_name, device_label, bias_thresh, log_dir):
     """Clone master notebook -> patch config cell -> execute -> save to outputs/."""
-    temp_nb    = SCRIPTS / f"_run_{log_dir_name}.ipynb"
+    master_nb  = NOTEBOOKS[nb_key]
+    suffix     = "v2" if nb_key == "v2" else "ref"
+    temp_nb    = SCRIPTS / f"_run_{suffix}_{log_dir_name}.ipynb"
     output_dir = log_dir / "outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_nb  = output_dir / f"gnss_quality_analysis_v2_{log_dir_name}.ipynb"
+    output_nb  = output_dir / f"gnss_quality_analysis_{suffix}_{log_dir_name}.ipynb"
 
     # 1. Clone master notebook
-    nb = json.loads(MASTER_NB.read_text(encoding="utf-8"))
+    nb = json.loads(master_nb.read_text(encoding="utf-8"))
 
-    # 2. Patch the config cell
-    # Note: Jupyter may store the cell source as a single multi-line string
-    # inside a one-element list, or as a proper list of lines. Handle both.
+    # 2. Patch the config cell (must contain LOG_DIR, DEVICE_NAME, BIAS_UNC_THRESH)
     patched = False
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":
@@ -121,35 +131,39 @@ def patch_and_execute(log_dir_name, device_label, bias_thresh, log_dir):
             break
 
     if not patched:
-        print("ERROR: could not find the config cell in the master notebook.")
+        print(f"ERROR: could not find the config cell in {master_nb.name}.")
         print("Make sure it contains LOG_DIR, DEVICE_NAME, and BIAS_UNC_THRESH.")
         sys.exit(1)
 
     temp_nb.write_text(json.dumps(nb, ensure_ascii=False, indent=1), encoding="utf-8")
 
     # 3. Execute
-    print("Executing notebook...  (this may take ~30 s)")
-    result = subprocess.run(
-        [
-            "jupyter", "nbconvert", "--to", "notebook", "--execute",
-            "--ExecutePreprocessor.timeout=300",
-            str(temp_nb),
-            "--output", temp_nb.name,
-            "--output-dir", str(SCRIPTS),
-        ],
-        capture_output=True, text=True,
-    )
+    label = "v2 (41-check)" if nb_key == "v2" else "ref (Google original)"
+    print(f"Executing [{label}] notebook...  (this may take ~60 s)")
+    cmd = [
+        "jupyter", "nbconvert", "--to", "notebook", "--execute",
+        "--ExecutePreprocessor.timeout=600",
+        str(temp_nb),
+        "--output", temp_nb.name,
+        "--output-dir", str(SCRIPTS),
+    ]
+    # For the reference notebook, save output even when a cell errors so that
+    # all successfully-executed cells (and their plots) are preserved.
+    if nb_key == "ref":
+        cmd.append("--allow-errors")
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        print("NOTEBOOK EXECUTION FAILED:\n")
+        print(f"NOTEBOOK EXECUTION FAILED [{label}]:\n")
         print(result.stderr[-3000:])
         temp_nb.unlink(missing_ok=True)
-        sys.exit(1)
+        return False
 
     # 4. Move executed notebook to outputs/
     shutil.move(str(temp_nb), str(output_nb))
-    print(f"\nDone.")
-    print(f"Executed notebook -> {output_nb.relative_to(ROOT)}")
+    print(f"  -> {output_nb.relative_to(ROOT)}")
+    return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,6 +176,8 @@ def main():
         help="Override auto-detected device label")
     parser.add_argument("--threshold", type=float, default=None,
         help="Override BiasUncertaintyNanos threshold (ns). Default: auto-detect")
+    parser.add_argument("--notebook", choices=["v2", "ref", "both"], default="both",
+        help="Which notebook(s) to run: v2, ref, or both (default: both)")
     args = parser.parse_args()
 
     log_dir_name = args.log_dir.rstrip("/\\")
@@ -192,9 +208,21 @@ def main():
     print(f"  Device     : {device_label}")
     print(f"  Chipset    : {info['chipset'] or '(not detected)'}")
     print(f"  Bias thresh: {bias_thresh} ns{note}")
+    print(f"  Notebooks  : {args.notebook}")
     print(sep + "\n")
 
-    patch_and_execute(log_dir_name, device_label, bias_thresh, log_dir)
+    to_run = ["v2", "ref"] if args.notebook == "both" else [args.notebook]
+    ok = True
+    for nb_key in to_run:
+        success = patch_and_execute(nb_key, log_dir_name, device_label, bias_thresh, log_dir)
+        if not success:
+            ok = False
+
+    if ok:
+        print(f"\nDone. All notebooks saved to {log_dir_name}/outputs/")
+    else:
+        print("\nOne or more notebooks failed. Check errors above.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

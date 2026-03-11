@@ -78,21 +78,32 @@ From the **project root** directory:
 python scripts/run_analysis.py Log4
 ```
 
+By default this runs **both** notebooks. To run only one:
+
+```bash
+python scripts/run_analysis.py Log4 --notebook v2    # v2 41-check only
+python scripts/run_analysis.py Log4 --notebook ref   # Google reference only
+python scripts/run_analysis.py Log4 --notebook both  # both (default)
+```
+
 ### What you will see
 
 ```
 ----------------------------------------------------
   Log dir    : Log4
-  Log file   : gnss_log_2026_03_10_09_30_00.txt
-  Device     : Google Pixel 9 (Android 16)
+  Log file   : gnss_log_2026_03_10_17_19_07.txt
+  Device     : Sony SO-51G (Android 16)
   Chipset    : MPSS.DE.9.0
   Bias thresh: 40.0 ns
+  Notebooks  : both
 ----------------------------------------------------
 
-Executing notebook...  (this may take ~30 s)
+Executing [v2 (41-check)] notebook...  (this may take ~60 s)
+  -> Log4\outputs\gnss_quality_analysis_v2_Log4.ipynb
+Executing [ref (Google original)] notebook...  (this may take ~60 s)
+  -> Log4\outputs\gnss_quality_analysis_ref_Log4.ipynb
 
-Done.
-Executed notebook -> Log4\outputs\gnss_quality_analysis_v2_Log4.ipynb
+Done. All notebooks saved to Log4/outputs/
 ```
 
 ### What the script does automatically
@@ -102,14 +113,15 @@ Executed notebook -> Log4\outputs\gnss_quality_analysis_v2_Log4.ipynb
 | Header parse | Reads `Manufacturer`, `Model`, `Platform`, `GNSS Hardware Model Name` from the `.txt` file's first comment line |
 | Device label | Builds `"<Manufacturer> <Model> (Android <version>)"` from parsed fields |
 | Threshold choice | `MPSS.HI` chipsets → 200 ns (reports 75–129 ns); all others → 40 ns |
-| Notebook clone | Copies `scripts/gnss_quality_analysis_v2.ipynb` to a temp file |
+| Notebook clone | Copies the master notebook to a temp file (master is never modified) |
 | Config patch | Replaces `LOG_DIR`, `DEVICE_NAME`, `BIAS_UNC_THRESH` in the temp copy |
 | Execution | Runs all cells via `jupyter nbconvert --execute` |
-| Save | Moves the executed notebook to `Log4/outputs/gnss_quality_analysis_v2_Log4.ipynb` |
+| Save | Moves the executed notebook to `Log4/outputs/` |
 | Cleanup | Deletes the temp copy |
 
-The **master notebook** (`scripts/gnss_quality_analysis_v2.ipynb`) is **never
-modified**.
+The ref notebook uses `--allow-errors` so it always saves even if some cells fail due to data quality issues (errors are shown inline in the notebook).
+
+The **master notebooks** (`scripts/gnss_quality_analysis_v2.ipynb` and `scripts/gnss_analysis_ref.ipynb`) are **never modified**.
 
 ---
 
@@ -125,19 +137,33 @@ Or open it directly in **VS Code** (with the Jupyter extension).
 
 The notebook contains all plots inline — no separate PNG files to manage.
 
-### What the notebook produces
+### What the notebooks produce
 
-| Output | Location | Description |
-|--------|----------|-------------|
-| Executed notebook | `Log4/outputs/gnss_quality_analysis_v2_Log4.ipynb` | All plots embedded |
-| CN0 over time | inline | Carrier-to-noise density per constellation |
-| Sky plot | inline | Polar satellite sky view coloured by CN0 |
-| Satellite counts | inline | Tracked vs used per constellation |
-| Fix scatter | inline | Position fixes coloured by provider |
-| Quality scorecard | inline | PASS / FAIL / N/A table for all 41 checks |
-| Quality radar | inline | Inverted radar chart (centre = PASS) |
-| Summary bar chart | inline | Per-section pass rate |
-| All PNGs | `Log4/outputs/` | Saved as `.png` files alongside the notebook |
+**v2 notebook** (`gnss_quality_analysis_v2_Log4.ipynb`):
+
+| Output | Description |
+|--------|-------------|
+| CN0 over time | Carrier-to-noise density per constellation |
+| Sky plot | Polar satellite sky view coloured by CN0 |
+| Satellite counts | Tracked vs used per constellation |
+| Fix scatter | Position fixes coloured by provider |
+| Quality scorecard | PASS / FAIL / N/A table for all 41 checks |
+| Quality radar | Inverted radar chart (centre = PASS) |
+| Summary bar chart | Per-section pass rate |
+| PNGs | Saved to `Log4/outputs/` alongside the notebook |
+
+**ref notebook** (`gnss_quality_analysis_ref_Log4.ipynb`):
+
+| Output | Description |
+|--------|-------------|
+| Conformance scorecard | 32-check Google framework results |
+| Spider plot | Radar chart of all conformance metrics |
+| C/N0 analysis | Per-epoch and per-satellite CN0 plots |
+| Clock bias | Delta clock bias over time |
+| PR / ADR / PRR residuals | Pseudorange, phase, and Doppler residual plots |
+| Time-sync analysis | GPS time vs ElapsedRealtime offset |
+
+> If the ref notebook encounters a data quality issue (duty cycling, poor WLS convergence), the error is shown inline and the notebook is still saved with all successfully-executed cells.
 
 ---
 
@@ -153,8 +179,11 @@ python scripts/run_analysis.py Log4 --device "Pixel 9 Pro (Tensor G4)"
 # Override BiasUncertaintyNanos threshold
 python scripts/run_analysis.py Log4 --threshold 200
 
-# Both at once
-python scripts/run_analysis.py Log4 --device "Custom Label" --threshold 100
+# Run only one notebook
+python scripts/run_analysis.py Log4 --notebook v2
+
+# All options combined
+python scripts/run_analysis.py Log4 --device "Custom Label" --threshold 100 --notebook both
 ```
 
 ---
@@ -245,17 +274,18 @@ pip install jupyter nbconvert
 ## Quick Reference
 
 ```bash
-# Analyse a new log
+# Analyse a new log (runs both notebooks)
 python scripts/run_analysis.py LogN
 
 # With overrides
-python scripts/run_analysis.py LogN --device "Label" --threshold 200
+python scripts/run_analysis.py LogN --device "Label" --threshold 200 --notebook v2
 
 # Standalone radar (after manually updating CHECKS in the script)
 python scripts/gnss_radar.py
 
 # View results
 jupyter notebook LogN/outputs/gnss_quality_analysis_v2_LogN.ipynb
+jupyter notebook LogN/outputs/gnss_quality_analysis_ref_LogN.ipynb
 ```
 
 ---
@@ -264,14 +294,17 @@ jupyter notebook LogN/outputs/gnss_quality_analysis_v2_LogN.ipynb
 
 | File | Purpose |
 |------|---------|
-| `scripts/run_analysis.py` | One-command runner — this is all you need |
-| `scripts/gnss_quality_analysis_v2.ipynb` | Master notebook (do not edit config here) |
-| `scripts/gnss_radar.py` | Standalone radar chart (edit manually) |
+| `scripts/run_analysis.py` | **One-command runner — this is all you need** |
+| `scripts/gnss_quality_analysis_v2.ipynb` | Master v2 notebook — 41-check framework (do not edit) |
+| `scripts/gnss_analysis_ref.ipynb` | Master ref notebook — Google original (do not edit) |
+| `scripts/gnss_analysis_original_reference.ipynb` | Original Google reference notebook (read-only) |
+| `scripts/gnss_radar.py` | Standalone radar chart (edit manually if needed) |
 | `parameters/thresholds.json` | All 41 quality thresholds — edit to change pass/fail criteria |
-| `LogN/outputs/gnss_quality_analysis_v2_LogN.ipynb` | Executed notebook with all results |
+| `LogN/outputs/gnss_quality_analysis_v2_LogN.ipynb` | Executed v2 notebook with all results |
+| `LogN/outputs/gnss_quality_analysis_ref_LogN.ipynb` | Executed ref notebook with Google conformance results |
 | `docs/00_overview.md` | Project structure and device comparison table |
 | `docs/01_gnsslogger_txt.md` | GnssLogger `.txt` format reference |
 | `docs/02_nmea.md` | NMEA 0183 format reference |
 | `docs/03_rinex.md` | RINEX 4.01 format reference |
-| `docs/LogN/04_data_summary.md` | Physical interpretation of LogN |
-| `docs/LogN/05_gnss_quality_report.md` | Detailed quality report for LogN |
+| `docs/LogN/04_data_summary.md` | Physical interpretation of LogN (manual writeup) |
+| `docs/LogN/05_gnss_quality_report.md` | Detailed quality report for LogN (manual writeup) |

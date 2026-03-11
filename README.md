@@ -6,24 +6,24 @@ Raw GNSS measurement analysis using Google's [GnssLogger](https://play.google.co
 
 ## Recordings at a Glance
 
-| | Log 1 | Log 2 | Log 3 |
-|--|-------|-------|-------|
-| **Device** | Xiaomi 13 (2201116PI) | Sony XQ-GE54 | Sony XQ-GE54 |
-| **Chipset** | Qualcomm MPSS.HI.4.3.1 | Qualcomm MPSS.DE.9.0 | Qualcomm MPSS.DE.9.0 |
-| **Android** | 13 | 16 | 16 |
-| **Date / Time (IST)** | 25 Feb 2026, 23:25–23:26 | 27 Feb 2026, 12:49–12:51 | 02 Mar 2026, 17:45–17:47 |
-| **Duration** | 44 s | 129 s | 120 s |
-| **Location** | 13.0667°N 77.5917°E, Bangalore | 13.0682°N 77.5918°E, Bangalore | 13.0682°N 77.5918°E, Bangalore |
-| **Altitude MSL** | 921.7 m | 958.7 m | 962.6 m |
-| **Raw measurements** | 311 | 7 181 | 4 440 |
-| **Constellations** | GPS GLO BDS GAL QZSS | GPS GLO BDS (B1I+B1C) GAL QZSS | GPS GLO BDS (B1C only) GAL QZSS |
-| **Mean CN0** | 23.4 dBHz | 38.1 dBHz | **43.9 dBHz** |
-| **BiasUncNanos** | 75–129 ns | 4.6–6.5 ns | 4.5–5.7 ns |
-| **Reported GPS Hacc** | 10.9 m | 3.8 m | 3.8 m |
-| **HDOP** | 0.7 | 0.4 | 0.4 |
-| **ADR (carrier phase)** | 0% (state = 0) | 0% valid (state = 16, half-cycle) | 0% valid (state = 16, half-cycle) |
-| **GPS L5** | Absent | Absent | Absent |
-| **Quality score (v2)** | **9 / 26 (35%)** | **18 / 27 (67%)** | **17 / 26 (65%)** |
+| | Log 1 | Log 2 | Log 3 | Log 4 |
+|--|-------|-------|-------|-------|
+| **Device** | Xiaomi 13 (2201116PI) | Sony XQ-GE54 | Sony XQ-GE54 | Sony SO-51G |
+| **Chipset** | Qualcomm MPSS.HI.4.3.1 | Qualcomm MPSS.DE.9.0 | Qualcomm MPSS.DE.9.0 | Qualcomm MPSS.DE.9.0 |
+| **Android** | 13 | 16 | 16 | 16 |
+| **Date / Time (IST)** | 25 Feb 2026, 23:25–23:26 | 27 Feb 2026, 12:49–12:51 | 02 Mar 2026, 17:45–17:47 | 10 Mar 2026, 17:19–17:22 |
+| **Duration** | 44 s | 129 s | 120 s | ~180 s |
+| **Location** | 13.0667°N 77.5917°E, Bangalore | 13.0682°N 77.5918°E, Bangalore | 13.0682°N 77.5918°E, Bangalore | Bangalore |
+| **Raw measurements** | 311 | 7 181 | 4 440 | 7 018 |
+| **Constellations** | GPS GLO BDS GAL QZSS | GPS GLO BDS (B1I+B1C) GAL QZSS | GPS GLO BDS (B1C only) GAL QZSS | GPS GLO BDS (B1C only) GAL QZSS |
+| **Mean CN0** | 23.4 dBHz | 38.1 dBHz | **43.9 dBHz** | **51.6 dBHz** |
+| **BiasUncNanos** | 75–129 ns | 4.6–6.5 ns | 4.5–5.7 ns | — |
+| **Reported GPS Hacc** | 10.9 m | 3.8 m | 3.8 m | — |
+| **HDOP** | 0.7 | 0.4 | 0.4 | 0.7 |
+| **ADR (carrier phase)** | 0% (state = 0) | 0% valid (state = 16, half-cycle) | 0% valid (state = 16, half-cycle) | 0% (state = 0) |
+| **GPS L5** | Absent | Absent | Absent | Absent |
+| **Quality score (v2)** | **10 / 26 (38%)** | **17 / 27 (63%)** | **17 / 26 (65%)** | **15 / 26 (58%)** |
+| **Ref notebook** | — (poor data quality) | ✓ | ✓ | — (too many clock discontinuities) |
 
 ---
 
@@ -35,17 +35,24 @@ GoogleGNSSLogger_LogAnalysis/
 ├── Log1/                          # Recording 1 — 25 Feb 2026, 23:25 IST (Xiaomi 13)
 │   ├── gnss_log_2026_02_25_*.txt / .nmea / .26o
 │   └── outputs/
-│       └── gnss_quality_analysis_v2_Log1.ipynb   ← executed notebook (all plots)
+│       └── gnss_quality_analysis_v2_Log1.ipynb     ← v2 41-check notebook
 │
 ├── Log2/                          # Recording 2 — 27 Feb 2026, 12:49 IST (Sony XQ-GE54)
 │   ├── gnss_log_2026_02_27_*.txt / .nmea / .26o
 │   └── outputs/
-│       └── gnss_quality_analysis_v2_Log2.ipynb   ← executed notebook (all plots)
+│       ├── gnss_quality_analysis_v2_Log2.ipynb     ← v2 41-check notebook
+│       └── gnss_quality_analysis_ref_Log2.ipynb    ← Google reference notebook
 │
 ├── Log3/                          # Recording 3 — 02 Mar 2026, 17:45 IST (Sony XQ-GE54)
 │   ├── gnss_log_2026_03_02_*.txt / .nmea / .26o
 │   └── outputs/
-│       └── gnss_quality_analysis_v2_Log3.ipynb   ← executed notebook (all plots)
+│       ├── gnss_quality_analysis_v2_Log3.ipynb     ← v2 41-check notebook
+│       └── gnss_quality_analysis_ref_Log3.ipynb    ← Google reference notebook
+│
+├── Log4/                          # Recording 4 — 10 Mar 2026, 17:19 IST (Sony SO-51G)
+│   ├── gnss_log_2026_03_10_*.txt / .nmea / .26o
+│   └── outputs/
+│       └── gnss_quality_analysis_v2_Log4.ipynb     ← v2 41-check notebook
 │
 ├── LogN/                          # Future logs — drop files here, then run:
 │   └── ...                        #   python scripts/run_analysis.py LogN
@@ -58,21 +65,23 @@ GoogleGNSSLogger_LogAnalysis/
 │   ├── 06_how_to_run.md           ← complete step-by-step guide
 │   ├── Log1/
 │   │   ├── 04_data_summary.md     ← Log1 physical interpretation
-│   │   └── 05_gnss_quality_report.md  ← Log1 quality report (legacy 35-metric)
+│   │   └── 05_gnss_quality_report.md  ← Log1 quality report
 │   ├── Log2/
 │   │   ├── 04_data_summary.md     ← Log2 physical interpretation
-│   │   └── 05_gnss_quality_report.md  ← Log2 quality report (v2 41-check)
+│   │   └── 05_gnss_quality_report.md  ← Log2 quality report
 │   └── Log3/
 │       ├── 04_data_summary.md     ← Log3 physical interpretation
-│       └── 05_gnss_quality_report.md  ← Log3 quality report (v2 41-check)
+│       └── 05_gnss_quality_report.md  ← Log3 quality report
 │
 ├── scripts/
-│   ├── run_analysis.py             ← ONE-COMMAND RUNNER: python scripts/run_analysis.py LogN
-│   ├── gnss_quality_analysis_v2.ipynb  ← master notebook (do not edit config here)
-│   ├── gnss_radar.py                   ← standalone inverted radar chart
-│   ├── gnss_analysis.py                ← legacy exploratory script (Log1)
-│   ├── gnss_analysis.ipynb             ← legacy exploratory notebook (Log1)
-│   └── gnss_quality_analysis.ipynb     ← legacy quality notebook (Log1, 35-metric)
+│   ├── run_analysis.py                     ← ONE-COMMAND RUNNER: python scripts/run_analysis.py LogN
+│   ├── gnss_quality_analysis_v2.ipynb      ← master v2 notebook (41-check framework)
+│   ├── gnss_analysis_ref.ipynb             ← master reference notebook (Google original, parameterised)
+│   ├── gnss_analysis_original_reference.ipynb  ← original Google reference (read-only)
+│   ├── gnss_radar.py                       ← standalone inverted radar chart
+│   ├── gnss_analysis.py                    ← legacy exploratory script (Log1)
+│   ├── gnss_analysis.ipynb                 ← legacy exploratory notebook (Log1)
+│   └── gnss_quality_analysis.ipynb         ← legacy quality notebook (Log1, 35-metric)
 │
 ├── parameters/
 │   ├── thresholds.json            ← all 41 quality thresholds (edit to change pass/fail criteria)
@@ -118,12 +127,19 @@ The script auto-detects everything from the GnssLogger header:
   - `MPSS.HI` → 200 ns (Snapdragon Gen 1 modem, reports 75–129 ns)
   - everything else → 40 ns (standard Google threshold)
 
-The executed notebook is saved to `Log4/outputs/gnss_quality_analysis_v2_Log4.ipynb` with all plots embedded.
+By default, **both** notebooks are executed (v2 and Google reference). Outputs are saved to `LogN/outputs/`:
+- `gnss_quality_analysis_v2_LogN.ipynb` — 41-check v2 analysis
+- `gnss_quality_analysis_ref_LogN.ipynb` — Google original reference analysis
+
+> **Note:** The reference notebook requires good-quality data. It will reject logs with too many clock discontinuities (duty-cycling) or insufficient WLS convergence.
 
 **Optional overrides:**
 ```bash
 python scripts/run_analysis.py Log4 --device "Pixel 9 Pro (Tensor G4)"
 python scripts/run_analysis.py Log4 --threshold 100
+python scripts/run_analysis.py Log4 --notebook v2    # v2 only
+python scripts/run_analysis.py Log4 --notebook ref   # reference only
+python scripts/run_analysis.py Log4 --notebook both  # both (default)
 ```
 
 ### Open the Master Notebook Manually
@@ -146,31 +162,34 @@ Edit `LOG_DIR_NAME`, `DEVICE`, `SCORE`, and `CHECKS` at the top to match the log
 
 ## Key Quality Results
 
-### Log 1 — Xiaomi 13 / MPSS.HI.4.3.1 — 9/26 PASS (35%)
+> Thresholds aligned to Google reference notebook v2026.01.29 in March 2026.
+
+### Log 1 — Xiaomi 13 / MPSS.HI.4.3.1 — 10/26 PASS (38%)
 
 | Section | Pass | Fail | N/A |
 |---------|:----:|:----:|:---:|
 | Basic Checks (14) | 5 | 3 | 6 |
 | Time (8) | 4 | 4 | 0 |
 | ADR / PRR / PR (7) | 0 | 2 | 5 |
-| Residuals (12) | 0 | 4 | 8 |
+| Residuals (12) | 1 | 4 | 7 |
 
 Key fails: CN0 top-4 only 25.6 dBHz, BiasUnc 75–129 ns, PRR clamped at ±500 m/s, no ADR.
+Ref notebook: not applicable (WLS fails due to poor signal quality).
 
 > **BiasUncertaintyNanos note:** MPSS.HI reports 75–129 ns — relax the analysis
 > threshold to 200 ns, otherwise all 311 measurements are filtered out.
 
-### Log 2 — Sony XQ-GE54 / MPSS.DE.9.0 — 18/27 PASS (67%)
+### Log 2 — Sony XQ-GE54 / MPSS.DE.9.0 — 17/27 PASS (63%)
 
 | Section | Pass | Fail | N/A |
 |---------|:----:|:----:|:---:|
 | Basic Checks (14) | 8 | 1 | 5 |
-| Time (8) | 4 | 4 | 0 |
+| Time (8) | 3 | 5 | 0 |
 | ADR / PRR / PR (7) | 0 | 2 | 5 |
 | Residuals (12) | 6 | 0 | 6 |
 
-Key passes: CN0 top-4 47.1 dBHz, BiasUnc 4.9 ns, PRR residual 0.422 m/s, 0% PR outliers, BDS B1C+B1I dual-frequency.
-Key fails: GPS L5 absent, ADR state = 16 (half-cycle reported, not valid), Delta ERTN jitter.
+Key passes: CN0 top-4 47.1 dBHz, BiasUnc 4.9 ns, 0% PR outliers, BDS B1C+B1I dual-frequency.
+Key fails: GPS L5 absent, ADR state = 16 (half-cycle, not valid), Delta ERTN jitter (stricter threshold).
 
 ### Log 3 — Sony XQ-GE54 / MPSS.DE.9.0 — 17/26 PASS (65%)
 
@@ -181,8 +200,21 @@ Key fails: GPS L5 absent, ADR state = 16 (half-cycle reported, not valid), Delta
 | ADR / PRR / PR (7) | 0 | 2 | 5 |
 | Residuals (12) | 4 | 2 | 6 |
 
-Key passes: CN0 top-4 **51.1 dBHz** (best of all logs), PRR residual **0.021 m/s**, clock bias std 0.035 m/s, 0% PR outliers, BDS B1C.
-Key fails: GPS L5 absent, ADR state = 16 (half-cycle, not valid), Delta ERTN jitter, BDS B1I absent (N/A — reduces denominator vs Log 2).
+Key passes: CN0 top-4 **51.1 dBHz**, PRR residual **0.021 m/s**, clock bias std 0.035 m/s, 0% PR outliers, BDS B1C.
+Key fails: GPS L5 absent, ADR state = 16 (half-cycle, not valid), Delta ERTN jitter, BDS B1I absent.
+
+### Log 4 — Sony SO-51G / MPSS.DE.9.0 — 15/26 PASS (58%)
+
+| Section | Pass | Fail | N/A |
+|---------|:----:|:----:|:---:|
+| Basic Checks (14) | 7 | 1 | 6 |
+| Time (8) | 3 | 5 | 0 |
+| ADR / PRR / PR (7) | 0 | 2 | 5 |
+| Residuals (12) | 5 | 3 | 4 |
+
+Key passes: CN0 top-4 **51.6 dBHz** (best across all logs), 0% PR outliers, PRR residual 0.037 m/s, clock bias std 0.235 m/s.
+Key fails: GPS L5 absent, ADR = 0%, Delta ERTN jitter, LS-PR residuals 99.28 m.
+Ref notebook: rejected — too many clock discontinuities (duty-cycling on SO-51G).
 
 ---
 

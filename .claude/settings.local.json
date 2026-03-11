@@ -5,7 +5,8 @@
       "Bash(python:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(pip install pymap3d seaborn 2>&1 | tail -5)"
     ]
   }
 }
