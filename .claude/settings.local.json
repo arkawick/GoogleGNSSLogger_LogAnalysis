@@ -6,7 +6,14 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(cp:*)",
-      "Bash(pip install pymap3d seaborn 2>&1 | tail -5)"
+      "Bash(pip install pymap3d seaborn 2>&1 | tail -5)",
+      "Bash(echo \"scale=2; \\(1772453859416 - 1772453740416\\) / 1000\" | bc)",
+      "Bash(python3 -c \"print\\(f'{\\(1772453859416 - 1772453740416\\) / 1000:.2f}'\\)\")",
+      "Bash(awk 'BEGIN { print \\(1772453859416 - 1772453740416\\) / 1000 }')",
+      "Bash(cd \"C:\\\\Users\\\\Arkajyoti\\\\Downloads\\\\GoogleGNSSLogger_LogAnalysis\" && python3 << 'EOFPY'\nimport json\nimport re\n\n# Read the notebook\nwith open\\(\"Log4/outputs/gnss_quality_analysis_ref_Log4.ipynb\", \"r\"\\) as f:\n    nb = json.load\\(f\\)\n\nprint\\(f\"Total cells: {len\\(nb['cells']\\)}\\\\n\"\\)\n\n# Extract device info from first few cells\nfor i, cell in enumerate\\(nb['cells'][:10]\\):\n    if cell['cell_type'] == 'code':\n        source = ''.join\\(cell['source']\\)\n        if 'DEVICE' in source or 'GNSS' in source or 'LOG' in source:\n            print\\(f\"=== CELL {i} \\(CODE\\) ===\"\\)\n            print\\(source[:500]\\)\n            print\\(\\)\n    elif cell['cell_type'] == 'markdown':\n        source = ''.join\\(cell['source']\\)\n        print\\(f\"=== CELL {i} \\(MARKDOWN\\) ===\"\\)\n        print\\(source\\)\n        print\\(\\)\n\nEOFPY)",
+      "Bash(python3 << 'EOFPY'\nimport json\nimport re\n\n# Read the notebook\nwith open\\(\"C:\\\\\\\\Users\\\\\\\\Arkajyoti\\\\\\\\Downloads\\\\\\\\GoogleGNSSLogger_LogAnalysis\\\\\\\\Log4\\\\\\\\outputs\\\\\\\\gnss_quality_analysis_ref_Log4.ipynb\", \"r\"\\) as f:\n    nb = json.load\\(f\\)\n\nprint\\(f\"Total cells: {len\\(nb['cells']\\)}\\\\n\"\\)\n\n# Extract first 15 cells to see structure\nfor i in range\\(min\\(15, len\\(nb['cells']\\)\\)\\):\n    cell = nb['cells'][i]\n    print\\(f\"\\\\n=== CELL {i} \\({cell['cell_type']}\\) ===\"\\)\n    source = ''.join\\(cell['source']\\) if isinstance\\(cell['source'], list\\) else cell['source']\n    print\\(source[:300]\\)\n\nEOFPY)",
+      "mcp__ide__executeCode",
+      "Bash(python3 -c \"\nimport json\nwith open\\('Log4/outputs/gnss_quality_analysis_ref_Log4.ipynb'\\) as f:\n    nb = json.load\\(f\\)\nprint\\(f'Total cells: {len\\(nb[\\\\\"cells\\\\\"]\\)}'\\)\n\")"
     ]
   }
 }

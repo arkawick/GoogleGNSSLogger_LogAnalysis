@@ -1,0 +1,249 @@
+================================================================================
+JIRA TICKET DRAFT — GNSS Quality Validation
+================================================================================
+
+SUMMARY
+-------
+GNSS Quality Validation using Google-provided tools — Sony XQ-GE54 (Log_PDX267)
+and Sony SO-51G (Log4)
+
+TICKET TYPE  : Task
+COMPONENT    : GNSS / Location
+PRIORITY     : Medium
+LABELS       : gnss, quality-validation, android, google-bootcamp
+
+
+================================================================================
+DESCRIPTION
+================================================================================
+
+BACKGROUND
+----------
+High-quality GNSS performance depends on three critical components: the GNSS
+chip, oscillator, and antenna. Google provides a standardized toolset to
+evaluate GNSS performance on Android devices:
+
+  - GnssLogger App     : Collects raw GNSS measurements from the device.
+  - gnss_analysis.ipynb: Google Colab notebook (v2026.01.29) that analyzes
+                         collected logs against 32 conformance checks with
+                         defined quality thresholds.
+
+This ticket documents the results of GNSS quality validation performed on two
+Sony devices using the above tools, in alignment with the Google Android
+Bootcamp GNSS Quality Framework.
+
+
+TEST SETUP
+----------
+  Tool (Logger)  : GnssLogger App (Android)
+  Tool (Analysis): gnss_analysis.ipynb — Google Colab (v2026.01.29)
+  Test type      : Static trace
+  Environment    : Indoor lab with GNSS signal repeater
+                   (Open-sky testing is not permitted at this facility.
+                    A GNSS signal repeater is used as an alternative.)
+  Location       : Bangalore, India (~13.067°N, 77.592°E)
+
+  IMPORTANT NOTE ON TEST ENVIRONMENT:
+  GNSS signal repeaters do not fully replicate open-sky signal
+  characteristics. The repeater introduces correlated signal path delays
+  and non-representative multipath conditions that are known to degrade
+  pseudorange residual metrics. Failures in PR residual checks should
+  therefore be interpreted in the context of this test environment
+  limitation, and not solely as a device defect.
+
+
+================================================================================
+DEVICE 1 — Sony XQ-GE54, Android 16 (Log_PDX267)
+================================================================================
+
+  Chipset      : Qualcomm MPSS.DE.9.0
+  Log file     : gnss_log_2026_03_02_17_45_40.txt
+  Date         : 2026-03-02
+  Duration     : 119 seconds
+  Measurements : 4,440
+  Constellations: GPS L1, GLONASS G1, Galileo E1, BeiDou B1C, QZSS L1
+
+  OVERALL SCORE: 17 / 26 applicable tests PASSED (65%)
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: BASIC SIGNAL CHECKS                                            │
+  ├──────────────────────────────────────────┬────────────┬────────┬────────┤
+  │ Test                                     │ Measured   │ Thresh │ Result │
+  ├──────────────────────────────────────────┼────────────┼────────┼────────┤
+  │ Avg C/N0 Top 4 Per Epoch                 │ 51.12 dBHz │ ≥40.0  │ PASS   │
+  │ Max Time Between Epochs                  │ 1000 ms    │ ≤2000  │ PASS   │
+  │ Avg Valid Signals/Epoch — GPS L1         │ 11.00      │ ≥7.5   │ PASS   │
+  │ Avg Valid Signals/Epoch — GLONASS G1     │  7.00      │ ≥4.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — Galileo E1     │  8.00      │ ≥5.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — BeiDou B1C     │  9.00      │ ≥4.0   │ PASS   │
+  │ Required Signal Types                    │ GPS_L5     │ All    │ FAIL * │
+  │                                          │ missing    │ present│        │
+  │ Measurement State Usable                 │ 100.0%     │ ≥85%   │ PASS   │
+  │ Duplicate Signals                        │ 0          │ = 0    │ PASS   │
+  └──────────────────────────────────────────┴────────────┴────────┴────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: TIMING CHECKS                                                  │
+  ├──────────────────────────────────────────┬────────────┬────────┬────────┤
+  │ Test                                     │ Measured   │ Thresh │ Result │
+  ├──────────────────────────────────────────┼────────────┼────────┼────────┤
+  │ Time Tag Large Jumps                     │ 0 gaps     │ = 0    │ PASS   │
+  │ Time Tag Jitter                          │ 0.000 ms   │ ≤10.0  │ PASS   │
+  │ Time-sync Max Jitter                     │ 0.000 ms   │ ≤2.2   │ PASS   │
+  │ Time-sync Jitter Std                     │ 0.000 ms   │ ≤2.5   │ PASS   │
+  │ Delta ElapsedRealtimeNanos Range         │ 1000.9 ms  │ ≤1.0   │ FAIL **│
+  │ Delta ElapsedRealtimeNanos Std           │ 161.52 ms  │ ≤2.5   │ FAIL **│
+  │ Delta Clock Bias MPS Std                 │ 0.0347 m/s │ ≤2.0   │ PASS   │
+  └──────────────────────────────────────────┴────────────┴────────┴────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: ADR / PRR / PR RESIDUALS                                       │
+  ├──────────────────────────────────────────┬────────────┬────────┬────────┤
+  │ Test                                     │ Measured   │ Thresh │ Result │
+  ├──────────────────────────────────────────┼────────────┼────────┼────────┤
+  │ LS-Freq PR Residuals Std                 │ 100.00 m   │ ≤5.0   │ FAIL ***│
+  │ Percent Valid ADR                        │ 0.0%       │ ≥70%   │ FAIL * │
+  │ Percent Usable ADR                       │ 0.0%       │ ≥65%   │ FAIL * │
+  │ L1-Freq PR Residuals Std                 │ 100.00 m   │ ≤6.5   │ FAIL ***│
+  │ L1-Freq Normalized PR Residual RMS       │ 23.157     │ ≤5.0   │ FAIL ***│
+  │ Percent PR Residual Outliers             │ 0.0%       │ ≤5%    │ PASS   │
+  │ Num Epochs for ADR Residual Analysis     │ 0 epochs   │ ≥1     │ FAIL * │
+  │ PRR Residuals Std                        │ 0.021 m/s  │ ≤0.21  │ PASS   │
+  │ Percent Epochs High PRR Residuals        │ 0.0%       │ ≤28%   │ PASS   │
+  │ Median Normalized PRR Residual RMS       │ 1.003      │ ≤3.0   │ PASS   │
+  └──────────────────────────────────────────┴────────────┴────────┴────────┘
+
+  FAILURE CLASSIFICATION
+  ----------------------
+
+  [*] Expected — Hardware Limitation (not a defect):
+
+    - Required Signal Types (GPS L5 missing):
+      The Sony XQ-GE54 does not support the GPS L5 frequency band.
+      This failure is expected and is a known hardware capability
+      boundary for this device.
+
+    - Percent Valid ADR / Percent Usable ADR / ADR Residual Epochs:
+      The device does not support ADR (Accumulated Delta Range /
+      carrier phase) measurements. ADR-based checks are therefore
+      not applicable. These failures are expected.
+
+  [**] Under Investigation — Hardware Clock Gaps:
+
+    - Delta ElapsedRealtimeNanos Range (1000.887 ms vs ≤1.0 ms)
+    - Delta ElapsedRealtimeNanos Std   (161.52 ms vs ≤2.5 ms)
+
+      These failures indicate large gaps between consecutive
+      ElapsedRealtimeNanos timestamps. This pattern is typically
+      associated with duty cycling being active on the device
+      (the GNSS receiver periodically powers off between measurement
+      epochs). The root cause on this specific unit is under
+      investigation. No corrective action has been taken yet.
+
+  [***] Test Environment Limitation — GNSS Signal Repeater:
+
+    - L1-Freq PR Residuals Std          (100.00 m vs ≤6.5 m)
+    - LS-Freq PR Residuals Std          (100.00 m vs ≤5.0 m)
+    - L1-Freq Normalized PR Residual RMS (23.157 vs ≤5.0)
+
+      Pseudorange residuals are significantly elevated. This is
+      consistent with a repeater-based test environment:
+        - The repeater re-broadcasts signals with additional fixed
+          path delays not present in an open-sky scenario.
+        - The positioning solver (WLS) produces large residuals when
+          signal timing does not conform to the expected open-sky
+          geometry model.
+      These failures are attributed to the test environment and are
+      not indicative of a device defect.
+
+  SUMMARY — Device 1:
+  All signal-strength, timing jitter, velocity (PRR), and measurement
+  state checks pass. The device performs well within expected bounds
+  for a device lacking L5 and ADR support, in a repeater environment.
+
+
+================================================================================
+DEVICE 2 — Sony SO-51G, Android 16 (Log4)
+================================================================================
+
+  Chipset      : Qualcomm MPSS.DE.9.0
+  Log file     : gnss_log_2026_03_10_17_19_07.txt
+  Date         : 2026-03-10
+  Duration     : ~180 seconds
+  Measurements : 7,018
+
+  OVERALL RESULT: TEST INVALID — gnss_analysis.ipynb ABORTED
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ Notebook Status: FAILED — Terminated at Cell 13 with fatal error        │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  Error raised by gnss_analysis.ipynb:
+  ─────────────────────────────────────
+    ValueError: "GNSS Log rejected: too many cycle slips."
+
+  0 out of 32 conformance checks were completed.
+
+  ROOT CAUSE: Duty Cycling Enabled on Device
+  -------------------------------------------
+  The Sony SO-51G had duty cycling (power-saving mode for GNSS) active
+  during the recording session. Duty cycling causes the GNSS receiver
+  hardware to periodically power off and restart to conserve battery.
+  Each restart produces a large, abrupt discontinuity in the hardware
+  clock (a "cycle slip"). When such slips occur too frequently, the
+  reference notebook's pre-processing step explicitly rejects the log
+  with the above error, as the discontinuities make it impossible to
+  reliably compute pseudoranges or perform WLS positioning.
+
+  The Google notebook enforces this check for all non-Wear-OS devices,
+  as duty cycling indicates the device is not in a compliant GNSS
+  measurement state for quality evaluation.
+
+  Cascading Errors (post-abort):
+  --------------------------------
+  Following the fatal error at Cell 13, all subsequent cells failed
+  with NameError / KeyError exceptions due to undefined variables
+  (cc_results, df_wls, millis_to_ecef_m, etc.) — these are
+  consequences of the early termination, not independent issues.
+
+  ACTION REQUIRED
+  ---------------
+  The test for Sony SO-51G must be re-run with duty cycling disabled:
+
+    1. On the device, go to:
+       Settings → Apps → GnssLogger → Battery → Set to "Unrestricted"
+    2. Keep the screen on during the entire capture session.
+    3. Disable any adaptive battery or power-saving modes before
+       starting the GnssLogger recording.
+    4. Re-run the capture for a minimum of 120 seconds in the same
+       repeater test environment.
+    5. Re-execute gnss_analysis.ipynb with the new log.
+
+
+================================================================================
+ACCEPTANCE CRITERIA
+================================================================================
+
+  [ ] Sony XQ-GE54 (Log_PDX267):
+      - Duty cycling investigation completed; root cause of
+        ElapsedRealtimeNanos failures documented or resolved.
+      - All non-L5/non-ADR checks confirmed as PASS or justified.
+
+  [ ] Sony SO-51G (Log4):
+      - Re-test completed with duty cycling disabled.
+      - gnss_analysis.ipynb executes without fatal errors.
+      - Results documented and reviewed against quality thresholds.
+
+
+================================================================================
+REFERENCES
+================================================================================
+
+  - Google GnssLogger App
+  - gnss_analysis.ipynb v2026.01.29 (Google Colab)
+  - Google Android Bootcamp GNSS Quality Framework (32 checks)
+  - Log files stored at: GoogleGNSSLogger_LogAnalysis/
+      Log_PDX267/outputs/gnss_quality_analysis_ref_Log_PDX267.ipynb
+      Log4/outputs/gnss_quality_analysis_ref_Log4.ipynb
+
+================================================================================

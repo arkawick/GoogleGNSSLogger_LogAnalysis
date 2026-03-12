@@ -1,0 +1,26 @@
+GPS/GNSS Update
+GNSS Quality :
+High-quality GNSS performance depends on three critical components :
+GNSS chip
+Oscillator
+Antenna
+Google provides tools and quality thresholds to evaluate and ensure GNSS performance on Android phones and Wear OS watches.
+Analysis Tools :
+GnssLogger App
+Collects raw GNSS measurements.
+gnss_analysis.ipynb (Colab)
+Analyzes GNSS quality metrics.
+Network connection required for :
+                - Assistance data
+                - SatPvt (required by gnss_analysis)
+Quality Thresholds :
+35 GNSS quality metrics with defined test thresholds.
+For best DGNSS performance, devices should :
+       - Support L1 + L5
+       - Support ADR (carrier phase)
+       - Pass all defined quality tests.
+Availability :
+GnssLogger app + gnss_analysis Colab (phones) : Available now
+GnssLogger app (Wear OS 2.0+) : Available now
+gnss_analysis Colab (watches) : Q1 2026
+Request : To validate GNSS quality using Google-provided tools and thresholds.
