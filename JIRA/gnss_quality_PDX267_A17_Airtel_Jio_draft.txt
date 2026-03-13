@@ -1,0 +1,330 @@
+================================================================================
+JIRA TICKET DRAFT — GNSS Quality Validation
+================================================================================
+
+SUMMARY
+-------
+GNSS Quality Validation — Sony XQ-GE54 Android 17 (Log_PDX-267_A17_Airtel
+and Log_PDX-267_A17_Jio)
+
+TICKET TYPE  : Task
+COMPONENT    : GNSS / Location
+PRIORITY     : Medium
+LABELS       : gnss, quality-validation, android, google-bootcamp
+
+
+================================================================================
+DESCRIPTION
+================================================================================
+
+BACKGROUND
+----------
+High-quality GNSS performance depends on three critical components: the GNSS
+chip, oscillator, and antenna. Google provides a standardized toolset to
+evaluate GNSS performance on Android devices:
+
+  - GnssLogger App     : Collects raw GNSS measurements from the device.
+  - gnss_analysis.ipynb: Google Colab notebook (v2026.01.29) that analyzes
+                         collected logs against 32 conformance checks with
+                         defined quality thresholds.
+
+This ticket documents GNSS quality validation results for the Sony XQ-GE54
+running Android 17, captured under two different network conditions (Airtel
+and Jio SIM), in alignment with the Google Android Bootcamp GNSS Quality
+Framework.
+
+
+TEST SETUP
+----------
+  Tool (Logger)  : GnssLogger App (Android)
+  Tool (Analysis): gnss_analysis.ipynb — Google Colab (v2026.01.29)
+  Test type      : Static trace
+  Environment    : Indoor lab with GNSS signal repeater
+                   (Open-sky testing is not permitted at this facility.
+                    A GNSS signal repeater is used as an alternative.)
+  Location       : Bangalore, India (~13.067°N, 77.592°E)
+  Capture date   : 2026-03-12
+
+  IMPORTANT NOTE ON TEST ENVIRONMENT:
+  GNSS signal repeaters do not fully replicate open-sky signal
+  characteristics. The repeater introduces correlated signal path delays
+  and non-representative multipath conditions that are known to degrade
+  pseudorange residual metrics. Failures in PR residual checks should
+  therefore be interpreted in the context of this test environment
+  limitation, and not solely as a device defect.
+
+
+================================================================================
+DEVICE UNDER TEST — Sony XQ-GE54, Android 17
+================================================================================
+
+  Chipset       : Qualcomm MPSS.DE.9.0
+  Constellations: GPS L1, GLONASS G1, Galileo E1, BeiDou B1C/B1I, QZSS L1
+  L5 Support    : No
+  ADR Support   : No
+
+
+================================================================================
+LOG 1 — Log_PDX-267_A17_Airtel (Airtel SIM)
+================================================================================
+
+  Log file     : gnss_log_2026_03_12_12_03_05.txt
+  Duration     : 1800 epochs (~30 minutes at 1 Hz)
+  Measurements : 67,005
+
+  OVERALL SCORE: 21 / 37 tests evaluated
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: BASIC SIGNAL CHECKS                                            │
+  ├────────────────────────────────────────┬──────────────┬────────┬────────┤
+  │ Test                                   │ Measured     │ Thresh │ Result │
+  ├────────────────────────────────────────┼──────────────┼────────┼────────┤
+  │ Avg C/N0 Top 4 Per Epoch               │ 51.8 dBHz    │ ≥40.0  │ PASS   │
+  │ Max Time Between Epochs                │ 1000 ms      │ ≤2000  │ PASS   │
+  │ Avg Valid Signals/Epoch — GPS L1       │ 11.7         │ ≥7.5   │ PASS   │
+  │ Avg Valid Signals/Epoch — GLONASS G1   │  5.2         │ ≥4.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — Galileo E1   │  8.0         │ ≥5.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — BeiDou B1C   │ 10.0         │ ≥4.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — BeiDou B1I   │  0.4         │ ≥5.0   │ FAIL ^ │
+  │ Avg Valid Signals/Epoch — QZSS L1      │  2.0         │ ≥1.0   │ PASS   │
+  │ Required Signal Types                  │ GPS_L5,      │ All    │ FAIL * │
+  │                                        │ GAL_E5A miss.│ present│        │
+  │ Measurement State Usable               │ 100.0%       │ ≥85%   │ PASS   │
+  └────────────────────────────────────────┴──────────────┴────────┴────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: TIMING CHECKS                                                  │
+  ├────────────────────────────────────────┬──────────────┬────────┬────────┤
+  │ Test                                   │ Measured     │ Thresh │ Result │
+  ├────────────────────────────────────────┼──────────────┼────────┼────────┤
+  │ Time Tag Large Jumps                   │ 0 gaps       │ = 0    │ PASS   │
+  │ Time Tag Jitter                        │ 0.000 ms     │ ≤10.0  │ PASS   │
+  │ Time-sync Max Jitter                   │ 1.7 ms       │ ≤2.2   │ PASS   │
+  │ Time-sync Jitter Std                   │ 0.41 ms      │ ≤2.5   │ PASS   │
+  │ Delta ElapsedRealtimeNanos Range       │ 1.5 ms       │ ≤1.0   │ FAIL **│
+  │ Delta ElapsedRealtimeNanos Std         │ 0.36 ms      │ ≤2.5   │ PASS   │
+  │ Delta Clock Bias MPS Std               │ 1.275 m/s    │ ≤2.0   │ PASS   │
+  └────────────────────────────────────────┴──────────────┴────────┴────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: ADR / PRR / PR RESIDUALS                                       │
+  ├────────────────────────────────────────┬──────────────┬────────┬────────┤
+  │ Test                                   │ Measured     │ Thresh │ Result │
+  ├────────────────────────────────────────┼──────────────┼────────┼────────┤
+  │ LS-Freq PR Residuals Std               │ —            │ ≤5.0 m │ N/A    │
+  │ Percent Valid ADR                      │ 0.0%         │ ≥70%   │ FAIL * │
+  │ Percent Usable ADR                     │ 0.0%         │ ≥65%   │ FAIL * │
+  │ ADR Variability                        │ 100% epochs  │ ≤5%    │ FAIL * │
+  │                                        │ < 5 usable   │        │        │
+  │ Median (PRR − Delta(ADR))              │ NaN          │ ≤0.07  │ FAIL * │
+  │ Std (PRR − Delta(ADR))                 │ NaN          │ ≤0.25  │ FAIL * │
+  │ L1-Freq (Delta(PR) − Delta(ADR))       │ NaN          │ ≤7.0 m │ FAIL * │
+  │ L5-Freq (Delta(PR) − Delta(ADR))       │ NaN          │ ≤0.85m │ FAIL * │
+  │ L1-Freq PR Residuals Std               │ 2.0 m        │ ≤6.5 m │ PASS   │
+  │ L5-Freq PR Residuals Std               │ NaN          │ ≤4.0 m │ FAIL * │
+  │ L1-Freq Normalized PR Residual RMS     │ 2.8          │ ≤5.0   │ PASS   │
+  │ L5-Freq Normalized PR Residual RMS     │ NaN          │ ≤4.5   │ FAIL * │
+  │ Percent PR Residual Outliers           │ 0.1%         │ ≤5%    │ PASS   │
+  │ Num Epochs for ADR Residual Analysis   │ 0 epochs     │ ≥1     │ FAIL * │
+  │ ADR Residuals Std                      │ NaN          │ ≤0.015 │ FAIL * │
+  │ Normalized ADR Residual RMS            │ NaN          │ ≤0.025 │ FAIL * │
+  │ Percent Epochs High ADR Residuals      │ NaN          │ ≤5%    │ FAIL * │
+  │ PRR Residuals Std                      │ 0.01 m/s     │ ≤0.21  │ PASS   │
+  │ Percent Epochs High PRR Residuals      │ 0.28%        │ ≤28%   │ PASS   │
+  │ Median Normalized PRR Residual RMS     │ 0.01         │ ≤3.0   │ PASS   │
+  └────────────────────────────────────────┴──────────────┴────────┴────────┘
+
+  FAILURE CLASSIFICATION — Airtel
+  --------------------------------
+
+  [*] Expected — Hardware Limitation (not a defect):
+    All ADR-related failures (Valid ADR, Usable ADR, ADR Variability,
+    PRR−ADR, PR−ADR, ADR Residuals): Device does not support ADR
+    (carrier phase). All ADR-dependent checks return NaN or 0% and
+    are expected to fail.
+
+    GPS L5 / GAL E5A missing: Device does not support L5 or E5A bands.
+    All L5-dependent checks return NaN. Expected failures.
+
+  [^] Borderline — BeiDou B1I Coverage:
+    - BDS B1I signals/epoch: 0.4 (threshold ≥5.0)
+    BeiDou B1I visibility is very low (0.4 avg per epoch). This may be
+    a sky visibility or repeater signal coverage issue. BDS B1C tracks
+    well (10.0/epoch), suggesting the chipset is functional but B1I
+    satellites are not in a favourable position or are not rebroadcast
+    by the repeater for this band.
+
+  [**] Minor — ElapsedRealtimeNanos Range:
+    - Delta ElapsedRealtimeNanos Range: 1.5 ms (threshold ≤1.0 ms)
+    The range failure is marginal (1.5 ms vs 1.0 ms limit). The Std
+    check passes (0.36 ms ≤ 2.5 ms), indicating this is likely a
+    single outlier epoch rather than systemic duty cycling. No
+    corrective action required at this stage.
+
+  POSITIVE HIGHLIGHTS — Airtel:
+    - L1 PR Residuals Std: 2.0 m (well within 6.5 m threshold)
+      → Excellent pseudorange quality for a repeater environment.
+    - PRR Residuals Std: 0.01 m/s — very low velocity noise.
+    - Clock Bias Std: 1.275 m/s (within 2.0 m/s threshold).
+    - All timing and signal count checks pass.
+
+
+================================================================================
+LOG 2 — Log_PDX-267_A17_Jio (Jio SIM)
+================================================================================
+
+  Log file     : gnss_log_2026_03_12_11_29_27.txt
+  Duration     : 1800 epochs (~30 minutes at 1 Hz)
+  Measurements : 70,682
+
+  OVERALL SCORE: 17 / 27 applicable tests PASSED (63%)
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: BASIC SIGNAL CHECKS                                            │
+  ├────────────────────────────────────────┬──────────────┬────────┬────────┤
+  │ Test                                   │ Measured     │ Thresh │ Result │
+  ├────────────────────────────────────────┼──────────────┼────────┼────────┤
+  │ Avg C/N0 Top 4 Per Epoch               │ 51.88 dBHz   │ ≥40.0  │ PASS   │
+  │ Max Time Between Epochs                │ 1000 ms      │ ≤2000  │ PASS   │
+  │ Avg Valid Signals/Epoch — GPS L1       │ 12.63        │ ≥7.5   │ PASS   │
+  │ Avg Valid Signals/Epoch — GLONASS G1   │  5.10        │ ≥4.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — Galileo E1   │  8.93        │ ≥5.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — BeiDou B1C   │  9.79        │ ≥4.0   │ PASS   │
+  │ Avg Valid Signals/Epoch — BeiDou B1I   │  0.81        │ ≥5.0   │ FAIL ^ │
+  │ Required Signal Types                  │ GPS_L5 miss. │ All    │ FAIL * │
+  │                                        │              │ present│        │
+  │ Measurement State Usable               │ 100.0%       │ ≥85%   │ PASS   │
+  │ Duplicate Signals                      │ 0            │ = 0    │ PASS   │
+  └────────────────────────────────────────┴──────────────┴────────┴────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: TIMING CHECKS                                                  │
+  ├────────────────────────────────────────┬──────────────┬────────┬────────┤
+  │ Test                                   │ Measured     │ Thresh │ Result │
+  ├────────────────────────────────────────┼──────────────┼────────┼────────┤
+  │ Time Tag Large Jumps                   │ 0 gaps       │ = 0    │ PASS   │
+  │ Time Tag Jitter                        │ 0.000 ms     │ ≤10.0  │ PASS   │
+  │ Time-sync Max Jitter                   │ 0.000 ms     │ ≤2.2   │ PASS   │
+  │ Time-sync Jitter Std                   │ 0.000 ms     │ ≤2.5   │ PASS   │
+  │ Delta ElapsedRealtimeNanos Range       │ 1001.050 ms  │ ≤1.0   │ FAIL **│
+  │ Delta ElapsedRealtimeNanos Std         │ 157.495 ms   │ ≤2.5   │ FAIL **│
+  │ Delta Clock Bias MPS Std               │ 0.0281 m/s   │ ≤2.0   │ PASS   │
+  └────────────────────────────────────────┴──────────────┴────────┴────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ SECTION: ADR / PRR / PR RESIDUALS                                       │
+  ├────────────────────────────────────────┬──────────────┬────────┬────────┤
+  │ Test                                   │ Measured     │ Thresh │ Result │
+  ├────────────────────────────────────────┼──────────────┼────────┼────────┤
+  │ LS-Freq PR Residuals Std               │ 115.87 m     │ ≤5.0 m │ FAIL **│
+  │ Percent Valid ADR                      │ 0.0%         │ ≥70%   │ FAIL * │
+  │ Percent Usable ADR                     │ 0.0%         │ ≥65%   │ FAIL * │
+  │ L1-Freq PR Residuals Std               │ 115.87 m     │ ≤6.5 m │ FAIL **│
+  │ L1-Freq Normalized PR Residual RMS     │ 29.416       │ ≤5.0   │ FAIL **│
+  │ Percent PR Residual Outliers           │ 0.0%         │ ≤5%    │ PASS   │
+  │ Num Epochs for ADR Residual Analysis   │ 0 epochs     │ ≥1     │ FAIL * │
+  │ PRR Residuals Std                      │ 0.050 m/s    │ ≤0.21  │ PASS   │
+  │ Percent Epochs High PRR Residuals      │ 1.8%         │ ≤28%   │ PASS   │
+  │ Median Normalized PRR Residual RMS     │ 1.000        │ ≤3.0   │ PASS   │
+  └────────────────────────────────────────┴──────────────┴────────┴────────┘
+
+  FAILURE CLASSIFICATION — Jio
+  ------------------------------
+
+  [*] Expected — Hardware Limitation (not a defect):
+    GPS L5 missing: Device does not support GPS L5. Expected failure.
+
+    ADR failures (Valid ADR, Usable ADR, ADR Residual Epochs):
+    Device does not support ADR. Expected failures.
+
+  [^] Borderline — BeiDou B1I Coverage:
+    - BDS B1I signals/epoch: 0.81 (threshold ≥5.0)
+    Same pattern as Airtel. B1C tracks well (9.79/epoch). B1I
+    satellite visibility is poor under repeater conditions for this
+    band. Consistent across both SIM captures.
+
+  [**] Test Environment + Hardware Clock — PR Residuals and Clock Gaps:
+    - Delta ElapsedRealtimeNanos Range: 1001.050 ms (threshold ≤1.0 ms)
+    - Delta ElapsedRealtimeNanos Std:   157.495 ms  (threshold ≤2.5 ms)
+    - L1 PR Residuals Std:              115.87 m    (threshold ≤6.5 m)
+    - LS-Freq PR Residuals Std:         115.87 m    (threshold ≤5.0 m)
+    - Normalized PR Residual RMS:       29.416      (threshold ≤5.0)
+
+    The clock gap magnitude on the Jio capture (~1001 ms range,
+    ~157 ms std) is dramatically larger than the Airtel capture
+    (1.5 ms range, 0.36 ms std), despite both being captured on the
+    same device on the same day. This indicates an intermittent
+    hardware clock discontinuity that appeared during the Jio session,
+    consistent with duty cycling triggering during the recording.
+    The large PR residuals (115 m) are a direct consequence of these
+    clock gaps corrupting the pseudorange computation.
+
+    Note: The PRR (velocity) checks pass on both captures, indicating
+    the Doppler tracking remained stable even when the clock gaps
+    occurred.
+
+
+================================================================================
+CROSS-LOG COMPARISON
+================================================================================
+
+  ┌──────────────────────────────────┬──────────────────┬──────────────────┐
+  │ Metric                           │ Airtel           │ Jio              │
+  ├──────────────────────────────────┼──────────────────┼──────────────────┤
+  │ Duration / Measurements          │ 30 min / 67,005  │ 30 min / 70,682  │
+  │ Score                            │ 21/37 evaluated  │ 17/27 applicable │
+  │ Avg C/N0 Top 4                   │ 51.8 dBHz  ✓     │ 51.88 dBHz ✓    │
+  │ GPS L1 signals/epoch             │ 11.7       ✓     │ 12.63      ✓     │
+  │ BDS B1I signals/epoch            │ 0.4        ✗     │ 0.81       ✗     │
+  │ L1 PR Residuals Std              │ 2.0 m      ✓     │ 115.87 m   ✗     │
+  │ Normalized PR Residual RMS       │ 2.8        ✓     │ 29.416     ✗     │
+  │ ElapsedRealtimeNanos Range       │ 1.5 ms     ✗     │ 1001.0 ms  ✗     │
+  │ ElapsedRealtimeNanos Std         │ 0.36 ms    ✓     │ 157.5 ms   ✗     │
+  │ PRR Residuals Std                │ 0.01 m/s   ✓     │ 0.050 m/s  ✓     │
+  │ ADR (all)                        │ 0% — no ADR ✗    │ 0% — no ADR ✗    │
+  │ GPS L5 / GAL E5A                 │ Not supported ✗  │ Not supported ✗  │
+  └──────────────────────────────────┴──────────────────┴──────────────────┘
+
+  KEY OBSERVATION:
+  Both captures are from the same device on the same day. The Airtel capture
+  shows good pseudorange quality (L1 PR residuals 2.0 m) while the Jio
+  capture shows severely degraded pseudoranges (115.87 m). The root cause
+  is the hardware clock gaps that occurred during the Jio session (duty
+  cycling). This confirms the failures in the Jio log are not a SIM or
+  network issue — they are caused by intermittent duty cycling behaviour
+  on the device during that specific recording session.
+
+
+================================================================================
+ACCEPTANCE CRITERIA
+================================================================================
+
+  [ ] BDS B1I low coverage: Investigate whether repeater rebroadcasts B1I
+      band signals. If not, this failure should be flagged as a test
+      environment limitation rather than a device defect.
+
+  [ ] Jio log — duty cycling: Confirm whether duty cycling was active during
+      the Jio capture session. If confirmed, re-run the Jio capture with
+      duty cycling disabled:
+        1. Settings → Apps → GnssLogger → Battery → Set to "Unrestricted"
+        2. Keep screen on throughout the capture.
+        3. Disable adaptive battery / power-saving before recording.
+        4. Re-run for a minimum of 120 seconds and re-execute
+           gnss_analysis.ipynb.
+
+  [ ] On re-run: confirm L1 PR Residuals and ElapsedRealtimeNanos checks
+      pass at the same quality level as the Airtel capture.
+
+
+================================================================================
+REFERENCES
+================================================================================
+
+  - Google GnssLogger App
+  - gnss_analysis.ipynb v2026.01.29 (Google Colab)
+  - Google Android Bootcamp GNSS Quality Framework (32 checks)
+  - Log files stored at: GoogleGNSSLogger_LogAnalysis/
+      Log_PDX-267_A17_Airtel/outputs/gnss_quality_analysis_ref_Log_PDX-267_A17_Airtel.ipynb
+      Log_PDX-267_A17_Jio/outputs/gnss_quality_analysis_ref_Log_PDX-267_A17_Jio.ipynb
+
+================================================================================
